@@ -365,7 +365,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         config_yaml_path = sys.argv[1]
     else:
-        config_yaml_path = os.path.join('lrkv/config/robust-lsm-trees.yaml')
+        config_yaml_path = os.path.join('lrkv/config/config.yaml')
 
     with open(config_yaml_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
