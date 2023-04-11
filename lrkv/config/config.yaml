@@ -1,0 +1,43 @@
+app:
+    app_name: "lrkv"
+    app_logging_level: "INFO"
+
+    ROOT_DIR: "lrkv"
+    DATA_DIR: "/home/weiping/code/lrkv/data"
+
+    BUILDER_PATH: "build/db_builder"
+    EXECUTION_PATH: "build/db_runner"
+    DATABASE_PATH: "/tmp"
+    KEY_FILE_PATH: "/home/weiping/code/lrkv/data/keys.data"
+
+lsm_tree_config: 
+    N: 10000000
+    phi: 1
+    s: 0.0000002        # Average range query selectivity
+    B: 4            # Number of entries that fit in a disk page
+    E: 8192         # Size of data entries in bits
+    M: 8589934592   # Total memory budget of 1 GiB
+    is_leveling_policy: False  # Leveling or Tiering policy
+
+jobs:
+    job_list:
+        - "run_experiments"
+
+experiments:
+    expt_list:
+        - "LevelCost"
+
+lr_model:
+    level_lr_cache_model: "model/level_lr_cache_model.pkl"
+    level_lr_cost_model: "model/level_lr_cost_model.pkl"
+    tier_lr_cache_model: "model/tier_lr_cache_model.pkl"
+    tier_lr_cost_model: "model/tier_lr_cost_model.pkl"
+
+xgb_model:
+    level_xgb_cost_model: "model/level_xgb_cost_model.pkl"
+    tier_xgb_cost_model: "model/tier_xgb_cost_model.pkl"
+
+
+save_path:
+    ckpt_path: "optimizer_data/optimizer_uniform_ckpt.csv"
+    final: "optimizer_data/optimizer_uniform_policy.csv"
