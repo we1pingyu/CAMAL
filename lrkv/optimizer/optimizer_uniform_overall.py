@@ -137,7 +137,7 @@ class Optimizer(object):
                 row['path_db'],
                 row['h'],
                 row['T'],
-                0,
+                N,
                 row['E'],
                 row['M'],
                 z0,
@@ -222,7 +222,7 @@ class Optimizer(object):
                 row['path_db'],
                 row['h'],
                 row['T'],
-                0,
+                N,
                 row['E'],
                 row['M'],
                 z0,
@@ -273,7 +273,7 @@ class Optimizer(object):
                 row['path_db'],
                 row['h'],
                 row['T'],
-                0,
+                N,
                 row['E'],
                 row['M'],
                 z0,
@@ -305,18 +305,12 @@ class Optimizer(object):
             # learned lr optimizer
             row = copy.deepcopy(row)
             row['optimizer'] = 'lr'
-            level_cost_models = pkl.load(
-                open(f"model/level_cost_lr_uniform_15.pkl", "rb")
-            )
+            level_cost_models = pkl.load(open(f"model/level_cost_lr_uniform.pkl", "rb"))
             level_cache_models = pkl.load(
-                open(f"model/level_cache_lr_uniform_15.pkl", "rb")
+                open(f"model/level_cache_lr_uniform.pkl", "rb")
             )
-            tier_cost_models = pkl.load(
-                open(f"model/tier_cost_lr_uniform_15.pkl", "rb")
-            )
-            tier_cache_models = pkl.load(
-                open(f"model/tier_cache_lr_uniform_15.pkl", "rb")
-            )
+            tier_cost_models = pkl.load(open(f"model/tier_cost_lr_uniform.pkl", "rb"))
+            tier_cache_models = pkl.load(open(f"model/tier_cache_lr_uniform.pkl", "rb"))
             (
                 best_T,
                 best_h,
@@ -405,8 +399,12 @@ class Optimizer(object):
             # learned xgb optimizer
             row = copy.deepcopy(row)
             row['optimizer'] = 'xgb'
-            level_cost_models = pkl.load(open("model/level_cost_xgb_uni_15.pkl", "rb"))
-            tier_cost_models = pkl.load(open("model/tier_cost_xgb_uni_15.pkl", "rb"))
+            level_cost_models = pkl.load(
+                open(self.config['xgb_model']['level_xgb_cost_model'], "rb")
+            )
+            tier_cost_models = pkl.load(
+                open(self.config['xgb_model']['tier_xgb_cost_model'], "rb")
+            )
             (
                 best_T,
                 best_h,
@@ -484,14 +482,13 @@ class Optimizer(object):
             self.logger.info('mbuf: {}'.format(row['mbuf']))
             # print(row)
             df.append(row)
-            pd.DataFrame(df).to_csv('optimizer_data/lr_optimizer_uniform_ckpt.csv')
+            pd.DataFrame(df).to_csv(self.config['save_path']['ckpt_path'])
         self.logger.info('Exporting data from lr optimizer')
-        pd.DataFrame(df).to_csv('optimizer_data/optimizer_uniform_overall_lim4.csv')
+        pd.DataFrame(df).to_csv(self.config['save_path']['final'])
         self.logger.info('Finished optimizer\n')
 
 
 if __name__ == "__main__":
-
     # Load configuration
     if len(sys.argv) > 1:
         config_yaml_path = sys.argv[1]
