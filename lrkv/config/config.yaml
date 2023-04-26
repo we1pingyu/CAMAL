@@ -3,12 +3,12 @@ app:
     app_logging_level: "INFO"
 
     ROOT_DIR: "lrkv"
-    DATA_DIR: "/home/weiping/code/lrkv/data"
+    DATA_DIR: "data"
 
     BUILDER_PATH: "build/db_builder"
     EXECUTION_PATH: "build/db_runner"
     DATABASE_PATH: "/tmp"
-    KEY_FILE_PATH: "/home/weiping/code/lrkv/data/keys.data"
+    KEY_FILE_PATH: "data/keys.data"
 
 lsm_tree_config: 
     N: 10000000

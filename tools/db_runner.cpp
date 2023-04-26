@@ -193,6 +193,7 @@ int main(int argc, char *argv[])
     spdlog::info("Building DB: {}", env.db_path);
     rocksdb::Options rocksdb_opt;
     // rocksdb_opt.memtable_factory.reset(rocksdb::NewHashSkipListRepFactory());
+    // rocksdb_opt.db = rocksdb::NewInMemoryDbOptions();
 
     rocksdb_opt.create_if_missing = true;
     rocksdb_opt.error_if_exists = true;
