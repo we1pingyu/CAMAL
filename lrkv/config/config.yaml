@@ -5,9 +5,10 @@ app:
     ROOT_DIR: "lrkv"
     DATA_DIR: "data"
 
-    BUILDER_PATH: "build/db_builder"
-    EXECUTION_PATH: "build/db_runner"
-    DATABASE_PATH: "/tmp"
+    # EXECUTION_PATH: "build/db_runner"
+    EXECUTION_PATH: "build/sim_runner"
+    # DATABASE_PATH: "/tmp"
+    DATABASE_PATH: "/dev/shm"
     KEY_FILE_PATH: "data/keys.data"
 
 lsm_tree_config: 
@@ -28,16 +29,21 @@ experiments:
         - "LevelCost"
 
 lr_model:
-    level_lr_cache_model: "model/level_lr_cache_model.pkl"
-    level_lr_cost_model: "model/level_lr_cost_model.pkl"
-    tier_lr_cache_model: "model/tier_lr_cache_model.pkl"
-    tier_lr_cost_model: "model/tier_lr_cost_model.pkl"
+    level_lr_cache_model: "model/level_lr_sim_cache_model.pkl"
+    level_lr_cost_model: "model/level_lr_sim_cost_model.pkl"
+    tier_lr_cache_model: "model/tier_lr_sim_cache_model.pkl"
+    tier_lr_cost_model: "model/tier_lr_sim_cost_model.pkl"
 
 xgb_model:
-    level_xgb_cost_model: "model/level_xgb_cost_model.pkl"
-    tier_xgb_cost_model: "model/tier_xgb_cost_model.pkl"
+    level_xgb_cost_model: "model/level_cost_xgb_uni_sim.pkl"
+    tier_xgb_cost_model: "model/tier_cost_xgb_uni_sim.pkl"
 
+samples_path:
+    level_ckpt: "raw_data/samples_sim_level_uniform_ckpt.csv"
+    level_final: "raw_data/samples_sim_level_uniform_policy.csv"
+    tier_ckpt: "raw_data/samples_sim_tier_uniform_ckpt.csv"
+    tier_final: "raw_data/samples_sim_tier_uniform_policy.csv"
 
-save_path:
-    ckpt_path: "optimizer_data/optimizer_uniform_ckpt.csv"
-    final: "optimizer_data/optimizer_uniform_policy.csv"
+optimizer_path:
+    ckpt: "optimizer_data/optimizer_sim_uniform_ckpt.csv"
+    final: "optimizer_data/optimizer_sim_uniform_final.csv"

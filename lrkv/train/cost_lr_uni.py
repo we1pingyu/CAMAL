@@ -21,7 +21,7 @@ M = 2147483648  # 256MB
 
 for num_sample in [15]:
     start_time = time.time()
-    all_samples = pd.read_csv('raw_data/camal_lr_level.csv')
+    all_samples = pd.read_csv('raw_data/samples_sim_level_uniform_policy.csv')
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
     Xc = []
@@ -98,17 +98,17 @@ for num_sample in [15]:
         error = abs(y_hat - Y_test)
         rerror = abs(y_hat - Y_test) / Y_test
         for _y_hat, _y, _error, _rerror in zip(y_hat, Y_test, error, rerror):
-            print('=' * 50)
-            print(_y_hat, _y)
-            print(_error, _rerror)
+            # print('=' * 50)
+            # print(_y_hat, _y)
+            # print(_error, _rerror)
             errors.append(_error)
             rerrors.append(_rerror)
     print('=' * 50)
     print(np.mean(errors), np.mean(rerrors))
-    pkl.dump(Wcs, open(f'model/level_cache_lr_uniform_{num_sample}.pkl', "wb"))
-    pkl.dump(Ws, open(f'model/level_cost_lr_uniform_{num_sample}.pkl', "wb"))
+    pkl.dump(Wcs, open(f'model/level_cache_lr_uniform_sim.pkl', "wb"))
+    pkl.dump(Ws, open(f'model/level_cost_lr_uniform_sim.pkl', "wb"))
     print(time.time() - start_time)
-    all_samples = pd.read_csv('raw_data/camal_lr_tier.csv')
+    all_samples = pd.read_csv('raw_data/samples_sim_tier_uniform_policy.csv')
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
 
@@ -193,5 +193,5 @@ for num_sample in [15]:
             rerrors.append(_rerror)
     print('=' * 50)
     print(np.mean(errors), np.mean(rerrors))
-    pkl.dump(Wcs, open(f'model/tier_cache_lr_uniform_{num_sample}.pkl', "wb"))
-    pkl.dump(Ws, open(f'model/tier_cost_lr_uniform_{num_sample}.pkl', "wb"))
+    pkl.dump(Wcs, open(f'model/tier_cache_lr_uniform_sim.pkl', "wb"))
+    pkl.dump(Ws, open(f'model/tier_cost_lr_uniform_sim.pkl', "wb"))

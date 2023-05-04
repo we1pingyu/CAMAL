@@ -67,7 +67,7 @@ environment parse_args(int argc, char *argv[])
     using namespace clipp;
     using std::to_string;
 
-    size_t minimum_entry_size = 32;
+    size_t minimum_entry_size = 2;
 
     environment env;
     bool help = false;
@@ -200,15 +200,14 @@ int main(int argc, char *argv[])
     rocksdb_opt.IncreaseParallelism(env.parallelism);
     rocksdb_opt.compression = rocksdb::kNoCompression;
     rocksdb_opt.bottommost_compression = kNoCompression;
-    rocksdb_opt.use_direct_reads = true;
-    rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
+    // rocksdb_opt.use_direct_reads = true;
+    // rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.advise_random_on_open = false;
     rocksdb_opt.random_access_max_buffer_size = 0;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
     tmpdb::TieredCompactor *tiered_compactor = nullptr;
     tmpdb::TieredOptions tiered_opt;
-    spdlog::error("error1");
 
     if (env.compaction_style == "level")
     {
@@ -237,7 +236,6 @@ int main(int argc, char *argv[])
         tiered_compactor = new tmpdb::TieredCompactor(tiered_opt, rocksdb_opt);
         rocksdb_opt.listeners.emplace_back(tiered_compactor);
     }
-    spdlog::error("error2");
     rocksdb::BlockBasedTableOptions table_options;
     if (env.compaction_style == "level")
     {
@@ -266,9 +264,7 @@ int main(int argc, char *argv[])
     rocksdb_opt.statistics = rocksdb::CreateDBStatistics();
     rocksdb::DB *db = nullptr;
     rocksdb::Status status = rocksdb::DB::Open(rocksdb_opt, env.db_path, &db);
-    spdlog::error("error3");
     // db->SetDBOptions({{"stats_level", "kExceptDetailedTimers"}});
-    spdlog::error("error4");
     if (!status.ok())
     {
         spdlog::error("Problems opening DB");
@@ -368,6 +364,7 @@ int main(int argc, char *argv[])
     rocksdb_opt.statistics->Reset();
     rocksdb::get_iostats_context()->Reset();
     rocksdb::get_perf_context()->Reset();
+    rocksdb::SetPerfLevel(rocksdb::PerfLevel::kEnableTime);
     std::mt19937 engine;
     std::uniform_real_distribution<double> dist(0, 1);
     double p[] = {env.empty_reads, env.non_empty_reads, env.range_reads, env.writes};
@@ -393,21 +390,21 @@ int main(int argc, char *argv[])
         case 0:
         {
             key = data_gen->gen_new_dup_key();
-            key_log->log_key(key);
+            // key_log->log_key(key);
             status = db->Get(rocksdb::ReadOptions(), key, &value);
             break;
         }
         case 1:
         {
             key = data_gen->gen_existing_key();
-            key_log->log_key(key);
+            // key_log->log_key(key);
             status = db->Get(rocksdb::ReadOptions(), key, &value);
             break;
         }
         case 2:
         {
             key = data_gen->gen_existing_key();
-            key_log->log_key(key);
+            // key_log->log_key(key);
             limit = std::to_string(stoi(key) + 2);
             for (it->Seek(rocksdb::Slice(key)); it->Valid() && it->key().ToString() < limit; it->Next())
             {
@@ -418,7 +415,7 @@ int main(int argc, char *argv[])
         case 3:
         {
             key_value = data_gen->gen_new_kv_pair(tiered_opt.entry_size);
-            key_log->log_key(key_value.first);
+            // key_log->log_key(key_value.first);
             db->Put(write_opt, key_value.first, key_value.second);
             break;
         }
@@ -459,15 +456,25 @@ int main(int argc, char *argv[])
         }
         while (tiered_compactor->compactions_left_count > 0)
             ;
-        // while (tiered_compactor->requires_compaction(db))
-        // {
-        //     while (tiered_compactor->compactions_left_count > 0)
-        //         ;
-        // }
     }
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
-
+    // rocksdb::SetPerfLevel(rocksdb::PerfLevel::kDisable);
+    // std::cout << "get_perf_context: \nget_from_memtable_time: " << rocksdb::get_perf_context()->get_from_memtable_time
+    //           << "\nget_from_output_files_time: " << rocksdb::get_perf_context()->get_from_output_files_time
+    //           << "\nblock_read_time: " << rocksdb::get_perf_context()->block_read_time
+    //           << "\nseek_on_memtable_time " << rocksdb::get_perf_context()->seek_on_memtable_time
+    //           << "\nseek_min_heap_time " << rocksdb::get_perf_context()->seek_min_heap_time
+    //           << "\nseek_max_heap_time " << rocksdb::get_perf_context()->seek_max_heap_time
+    //           << "\nseek_internal_seek_time " << rocksdb::get_perf_context()->seek_internal_seek_time
+    //           << "\nwrite_wal_time " << rocksdb::get_perf_context()->write_wal_time
+    //           << "\nwrite_memtable_time " << rocksdb::get_perf_context()->write_memtable_time
+    //           << "\nwrite_delay_time " << rocksdb::get_perf_context()->write_delay_time
+    //           << "\nwrite_scheduling_flushes_compactions_time " << rocksdb::get_perf_context()->write_scheduling_flushes_compactions_time
+    //           << "\nwrite_pre_and_post_process_time " << rocksdb::get_perf_context()->write_pre_and_post_process_time
+    //           << "\nwrite_nanos " << rocksdb::get_iostats_context()->write_nanos
+    //           << "\nread_nanos " << rocksdb::get_iostats_context()->read_nanos << std::endl;
+    // std::cout << rocksdb::get_iostats_context()->ToString() << std::endl;
     db->GetColumnFamilyMetaData(&cf_meta);
     run_per_level = "[";
     for (auto &level : cf_meta.levels)
@@ -477,7 +484,6 @@ int main(int argc, char *argv[])
     run_per_level = run_per_level.substr(0, run_per_level.size() - 2) + "]";
     spdlog::info("files_per_level : {}", run_per_level);
     rocksdb_opt.statistics->getTickerMap(&stats);
-
     spdlog::info("(l0, l1, l2plus) : ({}, {}, {})",
                  stats["rocksdb.l0.hit"],
                  stats["rocksdb.l1.hit"],
@@ -522,7 +528,6 @@ int main(int argc, char *argv[])
     }
     size_per_level = size_per_level.substr(0, size_per_level.size() - 2) + "]";
     spdlog::info("size_per_level : {}", size_per_level);
-    // spdlog::info("size_ratio : {}", rocksdb_opt.max_bytes_for_level_multiplier);
 
     db->Close();
     delete db;

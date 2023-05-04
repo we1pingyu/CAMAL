@@ -170,7 +170,7 @@ class Optimizer(object):
             self.logger.info('model_io: {}'.format(row['model_io']))
             # print(row)
             df.append(row)
-            pd.DataFrame(df).to_csv('optimizer_data/lr_optimizer_uniform_ckpt.csv')
+            pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
 
             # nominal + default cache optimizer
             row = copy.deepcopy(row)
@@ -255,7 +255,7 @@ class Optimizer(object):
             self.logger.info('model_io: {}'.format(row['model_io']))
             # print(row)
             df.append(row)
-            pd.DataFrame(df).to_csv('optimizer_data/lr_optimizer_uniform_ckpt.csv')
+            pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
 
             # rocksdb default setting
             row = copy.deepcopy(row)
@@ -300,7 +300,7 @@ class Optimizer(object):
             self.logger.info('mbuf: {}'.format(row['mbuf']))
             # print(row)
             df.append(row)
-            pd.DataFrame(df).to_csv('optimizer_data/lr_optimizer_uniform_ckpt.csv')
+            pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
 
             # learned lr optimizer
             row = copy.deepcopy(row)
@@ -394,7 +394,7 @@ class Optimizer(object):
             self.logger.info('mbuf: {}'.format(row['mbuf']))
             # print(row)
             df.append(row)
-            pd.DataFrame(df).to_csv('optimizer_data/lr_optimizer_uniform_ckpt.csv')
+            pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
 
             # learned xgb optimizer
             row = copy.deepcopy(row)
@@ -482,9 +482,9 @@ class Optimizer(object):
             self.logger.info('mbuf: {}'.format(row['mbuf']))
             # print(row)
             df.append(row)
-            pd.DataFrame(df).to_csv(self.config['save_path']['ckpt_path'])
+            pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
         self.logger.info('Exporting data from lr optimizer')
-        pd.DataFrame(df).to_csv(self.config['save_path']['final'])
+        pd.DataFrame(df).to_csv(self.config['optimizer_path']['final'])
         self.logger.info('Finished optimizer\n')
 
 

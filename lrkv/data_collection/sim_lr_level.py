@@ -15,7 +15,7 @@ from runner import Runner
 from lsm_tree.PyRocksDB import RocksDB
 from lsm_tree.cost_function import CostFunction
 from utils.model_lr import (
-    get_tier_cost,
+    get_level_cost,
     get_cache_uniform,
     traverse_for_T,
     traverse_for_h,
@@ -48,10 +48,11 @@ queries = 200000
 fold = 10
 
 
-class TierCost(object):
+class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
+        self.scaling = 1024 / 8
 
     def single_run(
         self,
@@ -72,8 +73,9 @@ class TierCost(object):
         self.logger.info(f'Building DB at size : {n}')
         row = self.config['lsm_tree_config'].copy()
 
-        row['db_name'] = 'tier_cost'
+        row['db_name'] = 'level_cost'
         row['path_db'] = self.config['app']['DATABASE_PATH']
+        buffer = buffer / self.scaling
         row['T'] = size_ratio
         row['N'] = n
         row['M'] = buffer + (bpe * n)
@@ -81,7 +83,7 @@ class TierCost(object):
         row['dist'] = dist
         row['skew'] = skew
         row['cache_cap'] = cache_cap
-        row['is_leveling_policy'] = False
+        row['is_leveling_policy'] = True
         row['queries'] = queries
         row['mbuf'] = buffer / 8
         row['z0'] = z0
@@ -98,7 +100,7 @@ class TierCost(object):
             row['h'],
             row['T'],
             row['N'],
-            row['E'],
+            int(row['E'] / self.scaling),
             row['M'],
             z0,
             z1,
@@ -178,7 +180,7 @@ class TierCost(object):
     def run(self):
         start_time = time.time()
         df = []
-        key_path = 'key_log_al_tier_cost'
+        key_path = 'key_log_al_level_cost'
         if not os.path.exists(key_path):
             os.makedirs(key_path)
         step = 0
@@ -193,11 +195,11 @@ class TierCost(object):
             # Train and search optimal size ratio
             min_err = 1e9
             for T in range(2, estimate_T(N, M / 2 / 8, 1) + 1):
-                err = T_tier_equation(T, z0, z1, q, w)
+                err = T_level_equation(T, q, w)
                 if err < min_err:
                     min_err = err
                     temp = T
-            T_list = self.sample_around_x0(temp, 3, 2, estimate_T(N, M / 2 / 8, 1))
+            T_list = self.sample_around_x0(temp, 6, 2, estimate_T(N, M / 2 / 8, 1))
             print(T_list)
             # continue
             z0, z1, q, w = workload
@@ -224,7 +226,7 @@ class TierCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['tier_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
                 step += 1
 
             # iter model
@@ -241,7 +243,7 @@ class TierCost(object):
                 Xc.append(xc)
                 Yc.append(np.log(sample['cache_hit_rate'] + eps))
                 X.append(
-                    get_tier_cost(
+                    get_level_cost(
                         sample['T'],
                         sample['h'],
                         sample['ratio'],
@@ -259,16 +261,16 @@ class TierCost(object):
             _X = np.array(X)
             _Y = np.array(Y)
             W = np.linalg.lstsq(_X, _Y, rcond=-1)[0]
-            candidates = traverse_for_T([W], [Wc], z0, z1, q, w, n=1, policy='tier')
+            candidates = traverse_for_T([W], [Wc], z0, z1, q, w, n=1, policy='level')
             T0 = candidates[0][0]
 
             min_err = 1e9
             for h in range(1, 17):
-                err = h_mbuf_tier_equation(h * N, z0, z1, q, w, T0)
+                err = h_mbuf_level_equation(h * N, z0, z1, q, w, T0)
                 if err < min_err:
                     min_err = err
                     temp = h
-            h_list = self.sample_around_x0(temp, 3, 1, 16)
+            h_list = self.sample_around_x0(temp, 6, 1, 16)
             print(h_list)
             for h in h_list:
                 buffer = ratio * M - h * N
@@ -290,7 +292,7 @@ class TierCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['tier_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
                 step += 1
             # iter model
             X = []
@@ -308,7 +310,7 @@ class TierCost(object):
                 Xc.append(xc)
                 Yc.append(np.log(sample['cache_hit_rate'] + eps))
                 X.append(
-                    get_tier_cost(
+                    get_level_cost(
                         sample['T'],
                         sample['h'],
                         sample['ratio'],
@@ -326,7 +328,7 @@ class TierCost(object):
             _X = np.array(X)
             _Y = np.array(Y)
             W = np.linalg.lstsq(_X, _Y, rcond=-1)[0]
-            candidates = traverse_for_h([W], [Wc], z0, z1, q, w, n=1, policy='tier')
+            candidates = traverse_for_h([W], [Wc], z0, z1, q, w, n=1, policy='level')
             h0 = candidates[0][1]
 
             min_err = 1e9
@@ -351,12 +353,12 @@ class TierCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['tier_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
                 step += 1
 
-        self.logger.info('Exporting data from active learning tier cost')
-        pd.DataFrame(df).to_csv(self.config['samples_path']['tier_final'])
-        self.logger.info(f'Finished al_tier_cost, use {time.time()-start_time}s\n')
+        self.logger.info('Exporting data from active learning level cost')
+        pd.DataFrame(df).to_csv(self.config['samples_path']['level_final'])
+        self.logger.info(f'Finished al_level_cost, use {time.time()-start_time}s\n')
 
 
 if __name__ == "__main__":
@@ -371,4 +373,4 @@ if __name__ == "__main__":
 
     # Start driver
     driver = Runner(config)
-    driver.run(TierCost(config))
+    driver.run(LevelCost(config))

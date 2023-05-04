@@ -224,7 +224,7 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv('raw_data/al_xgb_level_cost_ckpt.csv')
+                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
                 step += 1
 
             # iter model
@@ -290,7 +290,7 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv('raw_data/al_xgb_level_cost_ckpt.csv')
+                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
                 step += 1
             # iter model
             X = []
@@ -351,11 +351,11 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv('raw_data/al_xgb_level_cost_ckpt.csv')
+                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
                 step += 1
 
         self.logger.info('Exporting data from active learning level cost')
-        pd.DataFrame(df).to_csv('raw_data/camal_lr_level2.csv')
+        pd.DataFrame(df).to_csv(self.config['samples_path']['level_final'])
         self.logger.info(f'Finished al_level_cost, use {time.time()-start_time}s\n')
 
 
@@ -363,7 +363,7 @@ if __name__ == "__main__":
 
     # Load configuration
     if len(sys.argv) > 1:
-        config_yaml_path = sys.argv[1]
+        config_yaml_path =sys.argv[1]
     else:
         config_yaml_path = os.path.join('lrkv/config/config.yaml')
 

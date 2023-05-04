@@ -15,8 +15,6 @@
 #include "infrastructure/data_generator.hpp"
 using namespace ROCKSDB_NAMESPACE;
 
-
-
 typedef struct environment
 {
     std::string db_path;
@@ -49,8 +47,7 @@ typedef struct environment
 
 } environment;
 
-
-environment parse_args(int argc, char * argv[])
+environment parse_args(int argc, char *argv[])
 {
     using namespace clipp;
     using std::to_string;
@@ -60,76 +57,39 @@ environment parse_args(int argc, char * argv[])
     environment env;
     bool help = false;
 
-    auto general_opt = "general options" % (
-        (option("-v", "--verbose") & integer("level", env.verbose))
-            % ("Logging levels (DEFAULT: INFO, 1: DEBUG, 2: TRACE)"),
-        (option("-h", "--help").set(help, true)) % "prints this message"
-    );
+    auto general_opt = "general options" % ((option("-v", "--verbose") & integer("level", env.verbose)) % ("Logging levels (DEFAULT: INFO, 1: DEBUG, 2: TRACE)"),
+                                            (option("-h", "--help").set(help, true)) % "prints this message");
 
-    auto build_opt = (
-        "build options:" % (
-            (value("db_path", env.db_path)) % "path to the db",
-            (option("-T", "--size-ratio") & number("ratio", env.T))
-                % ("size ratio, [default: " + fmt::format("{:.0f}", env.T) + "]"),
-            (option("-K", "--lower_level_lim") & number("lim", env.K))
-                % ("lower levels file limit, [default: " + fmt::format("{:.0f}", env.K) + "]"),
-            (option("-Z", "--last_level_lim") & number("lim", env.Z))
-                % ("last level file limit, [default: " + fmt::format("{:.0f}", env.Z) + "]"),
-            (option("-B", "--buffer-size") & integer("size", env.B))
-                % ("buffer size (in bytes), [default: " + to_string(env.B) + "]"),
-            (option("-E", "--entry-size") & integer("size", env.E))
-                % ("entry size (bytes) [default: " + to_string(env.E) + ", min: 32]"),
-            (option("-b", "--bpe") & number("bits", env.bits_per_element))
-                % ("bits per entry per bloom filter [default: " + fmt::format("{:.1f}", env.bits_per_element) + "]"),
-            (option("-d", "--destroy").set(env.destroy_db)) % "destroy the DB if it exists at the path"
-        ),
-        "db fill options (pick one):" % (
-            one_of(
-                (option("-N", "--entries").set(env.bulk_load_mode, tmpdb::bulk_load_type::ENTRIES) & integer("num", env.N))
-                    % ("total entries, default pick [default: " + to_string(env.N) + "]"),
-                (option("-L", "--levels").set(env.bulk_load_mode, tmpdb::bulk_load_type::LEVELS) & integer("num", env.L)) 
-                    % ("total filled levels [default: " + to_string(env.L) + "]")
-            )
-        )
-    );
+    auto build_opt = ("build options:" % ((value("db_path", env.db_path)) % "path to the db",
+                                          (option("-T", "--size-ratio") & number("ratio", env.T)) % ("size ratio, [default: " + fmt::format("{:.0f}", env.T) + "]"),
+                                          (option("-K", "--lower_level_lim") & number("lim", env.K)) % ("lower levels file limit, [default: " + fmt::format("{:.0f}", env.K) + "]"),
+                                          (option("-Z", "--last_level_lim") & number("lim", env.Z)) % ("last level file limit, [default: " + fmt::format("{:.0f}", env.Z) + "]"),
+                                          (option("-B", "--buffer-size") & integer("size", env.B)) % ("buffer size (in bytes), [default: " + to_string(env.B) + "]"),
+                                          (option("-E", "--entry-size") & integer("size", env.E)) % ("entry size (bytes) [default: " + to_string(env.E) + ", min: 32]"),
+                                          (option("-b", "--bpe") & number("bits", env.bits_per_element)) % ("bits per entry per bloom filter [default: " + fmt::format("{:.1f}", env.bits_per_element) + "]"),
+                                          (option("-d", "--destroy").set(env.destroy_db)) % "destroy the DB if it exists at the path"),
+                      "db fill options (pick one):" % (one_of(
+                                                          (option("-N", "--entries").set(env.bulk_load_mode, tmpdb::bulk_load_type::ENTRIES) & integer("num", env.N)) % ("total entries, default pick [default: " + to_string(env.N) + "]"),
+                                                          (option("-L", "--levels").set(env.bulk_load_mode, tmpdb::bulk_load_type::LEVELS) & integer("num", env.L)) % ("total filled levels [default: " + to_string(env.L) + "]"))));
 
-    auto minor_opt = (
-        "minor options:" % (
-            (option("--max_rocksdb_level") & integer("num", env.max_rocksdb_levels))
-                % ("limits the maximum levels rocksdb has [default: " + to_string(env.max_rocksdb_levels) + "]"),
-            (option("--parallelism") & integer("num", env.parallelism))
-                % ("parallelism for writing to db [default: " + to_string(env.parallelism) + "]"),
-            (option("--seed") & integer("num", env.seed))
-                % "seed for generating data [default: random from time]",
-            (option("--early_fill_stop").set(env.early_fill_stop, true))
-                % "Stops bulk loading early if N is met [default: False]",
-            (option("--key-file").set(env.use_key_file, true) & value("file", env.key_file))
-                % "use keyfile to speed up bulk loading"
-        )
-    );
+    auto minor_opt = ("minor options:" % ((option("--max_rocksdb_level") & integer("num", env.max_rocksdb_levels)) % ("limits the maximum levels rocksdb has [default: " + to_string(env.max_rocksdb_levels) + "]"),
+                                          (option("--parallelism") & integer("num", env.parallelism)) % ("parallelism for writing to db [default: " + to_string(env.parallelism) + "]"),
+                                          (option("--seed") & integer("num", env.seed)) % "seed for generating data [default: random from time]",
+                                          (option("--early_fill_stop").set(env.early_fill_stop, true)) % "Stops bulk loading early if N is met [default: False]",
+                                          (option("--key-file").set(env.use_key_file, true) & value("file", env.key_file)) % "use keyfile to speed up bulk loading"));
 
     auto file_size_policy_opt =
-    (
-        "file size policy (pick one)" % 
-        one_of(
-            (
-                option("--increasing_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::INCREASING)
-                    % "file size will match run size as LSM tree grows (default)",
-                (option("--fixed_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::FIXED)
-                    & opt_integer("size", env.fixed_file_size))
-                    % "fixed file size specified after fixed_files flag [default size MAX uint64]",
-                option("--buffer_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::BUFFER)
-                    % "file size matches the buffer size"
-            )
-        )
-    );
+        ("file size policy (pick one)" %
+         one_of(
+             (
+                 option("--increasing_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::INCREASING) % "file size will match run size as LSM tree grows (default)",
+                 (option("--fixed_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::FIXED) & opt_integer("size", env.fixed_file_size)) % "fixed file size specified after fixed_files flag [default size MAX uint64]",
+                 option("--buffer_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::BUFFER) % "file size matches the buffer size")));
 
-    auto cli = (
-        general_opt,
-        build_opt,
-        minor_opt,
-        file_size_policy_opt
-    );
+    auto cli = (general_opt,
+                build_opt,
+                minor_opt,
+                file_size_policy_opt);
 
     if (!parse(argc, argv, cli))
         help = true;
@@ -149,7 +109,6 @@ environment parse_args(int argc, char * argv[])
 
     return env;
 }
-
 
 void fill_fluid_opt(environment env, tmpdb::FluidOptions &fluid_opt)
 {
@@ -176,7 +135,7 @@ void fill_fluid_opt(environment env, tmpdb::FluidOptions &fluid_opt)
     fluid_opt.fixed_file_size = env.fixed_file_size;
 }
 
-void build_db(environment & env)
+void build_db(environment &env)
 {
     spdlog::info("Building DB: {}", env.db_path);
     rocksdb::Options rocksdb_opt;
@@ -190,26 +149,25 @@ void build_db(environment & env)
     rocksdb_opt.level0_file_num_compaction_trigger = -1;
     rocksdb_opt.IncreaseParallelism(env.parallelism);
     rocksdb_opt.disable_auto_compactions = true;
-    rocksdb_opt.write_buffer_size = env.B; 
+    rocksdb_opt.write_buffer_size = env.B;
     rocksdb_opt.num_levels = env.max_rocksdb_levels;
-   // Prevents rocksdb from limiting file size
-    
+    // Prevents rocksdb from limiting file size
+
     rocksdb_opt.target_file_size_base = UINT64_MAX;
     // rocksdb_opt.max_bytes_for_level_multiplier = env.T;
 
-
     fill_fluid_opt(env, fluid_opt);
     DataGenerator *gen = new YCSBGenerator(env.N, "uniform", 0.0);
-    
+
     FluidLSMBulkLoader *fluid_compactor = new FluidLSMBulkLoader(
-            *gen, fluid_opt, rocksdb_opt, env.early_fill_stop);
+        *gen, fluid_opt, rocksdb_opt, env.early_fill_stop);
     rocksdb_opt.listeners.emplace_back(fluid_compactor);
-    
+
     rocksdb::BlockBasedTableOptions table_options;
     table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(env.bits_per_element));
     table_options.no_block_cache = true;
     rocksdb_opt.table_factory.reset(
-            rocksdb::NewBlockBasedTableFactory(table_options));
+        rocksdb::NewBlockBasedTableFactory(table_options));
 
     rocksdb::DB *db = nullptr;
     rocksdb::Status status = rocksdb::DB::Open(rocksdb_opt, env.db_path, &db);
@@ -238,13 +196,14 @@ void build_db(environment & env)
     }
 
     spdlog::info("Waiting for all compactions to finish before closing");
-    // Use an original rocksdb flush to fix the tree structure and 
+    // Use an original rocksdb flush to fix the tree structure and
     // wait for all compactions to finish before flushing and closing DB
     // rocksdb::FlushOptions flush_opt;
     // flush_opt.wait = true;
     // flush_opt.allow_write_stall = true;
     // db->Flush(flush_opt);
-    while(fluid_compactor->compactions_left_count > 0);
+    while (fluid_compactor->compactions_left_count > 0)
+        ;
     // while(fluid_compactor->requires_compaction(db))
     // {
     //     while(fluid_compactor->compactions_left_count > 0);
@@ -257,10 +216,10 @@ void build_db(environment & env)
 
         std::vector<std::string> file_names;
         int level_idx = 1;
-        for (auto & level : cf_meta.levels)
+        for (auto &level : cf_meta.levels)
         {
             std::string level_str = "";
-            for (auto & file : level.files)
+            for (auto &file : level.files)
             {
                 level_str += file.name + ", ";
             }
@@ -275,15 +234,15 @@ void build_db(environment & env)
     db->GetColumnFamilyMetaData(&cf_meta);
 
     std::string run_per_level = "[";
-    for (auto & level : cf_meta.levels)
+    for (auto &level : cf_meta.levels)
     {
         run_per_level += std::to_string(level.files.size()) + ", ";
     }
     run_per_level = run_per_level.substr(0, run_per_level.size() - 2) + "]";
     spdlog::info("runs_per_level_build : {}", run_per_level);
-    
+
     std::string size_per_level = "[";
-    for (auto & level : cf_meta.levels)
+    for (auto &level : cf_meta.levels)
     {
         size_per_level += std::to_string(level.size) + ", ";
     }
@@ -293,19 +252,18 @@ void build_db(environment & env)
     delete db;
 }
 
-
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
     spdlog::set_pattern("[%T.%e]%^[%l]%$ %v");
     environment env = parse_args(argc, argv);
 
     spdlog::info("Welcome to db_builder!");
-    if(env.verbose == 1)
+    if (env.verbose == 1)
     {
         spdlog::info("Log level: DEBUG");
         spdlog::set_level(spdlog::level::debug);
     }
-    else if(env.verbose == 2)
+    else if (env.verbose == 2)
     {
         spdlog::info("Log level: TRACE");
         spdlog::set_level(spdlog::level::trace);
@@ -323,7 +281,7 @@ int main(int argc, char * argv[])
     }
 
     build_db(env);
-    
+
     // if (env.use_key_file)
     // {
     //     spdlog::info("Copying key file to DB path");

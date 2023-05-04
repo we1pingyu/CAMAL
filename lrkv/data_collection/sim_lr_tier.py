@@ -52,6 +52,7 @@ class TierCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
+        self.scaling = 1024 / 8
 
     def single_run(
         self,
@@ -74,6 +75,7 @@ class TierCost(object):
 
         row['db_name'] = 'tier_cost'
         row['path_db'] = self.config['app']['DATABASE_PATH']
+        buffer = buffer / self.scaling
         row['T'] = size_ratio
         row['N'] = n
         row['M'] = buffer + (bpe * n)
@@ -98,7 +100,7 @@ class TierCost(object):
             row['h'],
             row['T'],
             row['N'],
-            row['E'],
+            int(row['E'] / self.scaling),
             row['M'],
             z0,
             z1,
@@ -197,7 +199,7 @@ class TierCost(object):
                 if err < min_err:
                     min_err = err
                     temp = T
-            T_list = self.sample_around_x0(temp, 3, 2, estimate_T(N, M / 2 / 8, 1))
+            T_list = self.sample_around_x0(temp, 6, 2, estimate_T(N, M / 2 / 8, 1))
             print(T_list)
             # continue
             z0, z1, q, w = workload
@@ -268,7 +270,7 @@ class TierCost(object):
                 if err < min_err:
                     min_err = err
                     temp = h
-            h_list = self.sample_around_x0(temp, 3, 1, 16)
+            h_list = self.sample_around_x0(temp, 6, 1, 16)
             print(h_list)
             for h in h_list:
                 buffer = ratio * M - h * N

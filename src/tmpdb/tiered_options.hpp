@@ -33,7 +33,7 @@ namespace tmpdb
         int lower_level_run_max = 1;   //> (K)
         int largest_level_run_max = 1; //> (Z)
         size_t buffer_size = 1048576;  //> bytes (B) defaults 1 MB
-        size_t entry_size = 8192;      //> bytes (E)
+        size_t entry_size = 1024;      //> bytes (E)
         double bits_per_element = 5.0; //> bits per element per bloom filter at all levels (h)
         bulk_load_type bulk_load_opt = ENTRIES;
         file_size_policy file_size_policy_opt = INCREASING;
