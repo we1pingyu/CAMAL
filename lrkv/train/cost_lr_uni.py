@@ -186,9 +186,9 @@ for num_sample in [15]:
         error = abs(y_hat - Y_test)
         rerror = abs(y_hat - Y_test) / Y_test
         for _y_hat, _y, _error, _rerror in zip(y_hat, Y_test, error, rerror):
-            print('=' * 50)
-            print(_y_hat, _y)
-            print(_error, _rerror)
+            # print('=' * 50)
+            # print(_y_hat, _y)
+            # print(_error, _rerror)
             errors.append(_error)
             rerrors.append(_rerror)
     print('=' * 50)

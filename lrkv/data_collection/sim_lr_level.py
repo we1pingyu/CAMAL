@@ -52,7 +52,8 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
-        self.scaling = 1024 / 8
+        self.scaling = 8 / 1024
+        self.sampels = 3
 
     def single_run(
         self,
@@ -75,7 +76,7 @@ class LevelCost(object):
 
         row['db_name'] = 'level_cost'
         row['path_db'] = self.config['app']['DATABASE_PATH']
-        buffer = buffer / self.scaling
+        buffer = buffer
         row['T'] = size_ratio
         row['N'] = n
         row['M'] = buffer + (bpe * n)
@@ -85,7 +86,7 @@ class LevelCost(object):
         row['cache_cap'] = cache_cap
         row['is_leveling_policy'] = True
         row['queries'] = queries
-        row['mbuf'] = buffer / 8
+        row['mbuf'] = buffer
         row['z0'] = z0
         row['z1'] = z1
         row['q'] = q
@@ -100,8 +101,8 @@ class LevelCost(object):
             row['h'],
             row['T'],
             row['N'],
-            int(row['E'] / self.scaling),
-            row['M'],
+            int(row['E'] * self.scaling),
+            buffer * self.scaling + (bpe * n),
             z0,
             z1,
             q,
@@ -110,7 +111,7 @@ class LevelCost(object):
             skew,
             queries,
             is_leveling_policy=row['is_leveling_policy'],
-            cache_cap=cache_cap,
+            cache_cap=cache_cap * self.scaling,
             key_log=key_log,
         )
 
@@ -199,7 +200,9 @@ class LevelCost(object):
                 if err < min_err:
                     min_err = err
                     temp = T
-            T_list = self.sample_around_x0(temp, 6, 2, estimate_T(N, M / 2 / 8, 1))
+            T_list = self.sample_around_x0(
+                temp, self.sampels, 2, estimate_T(N, M / 2 / 8, 1)
+            )
             print(T_list)
             # continue
             z0, z1, q, w = workload
@@ -270,7 +273,7 @@ class LevelCost(object):
                 if err < min_err:
                     min_err = err
                     temp = h
-            h_list = self.sample_around_x0(temp, 6, 1, 16)
+            h_list = self.sample_around_x0(temp, self.sampels, 1, 16)
             print(h_list)
             for h in h_list:
                 buffer = ratio * M - h * N

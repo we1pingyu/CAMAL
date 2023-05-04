@@ -5,10 +5,10 @@ app:
     ROOT_DIR: "lrkv"
     DATA_DIR: "data"
 
-    # EXECUTION_PATH: "build/db_runner"
-    EXECUTION_PATH: "build/sim_runner"
-    # DATABASE_PATH: "/tmp"
-    DATABASE_PATH: "/dev/shm"
+    EXECUTION_PATH: "build/db_runner"
+    # EXECUTION_PATH: "build/sim_runner"
+    DATABASE_PATH: "/tmp"
+    # DATABASE_PATH: "/dev/shm"
     KEY_FILE_PATH: "data/keys.data"
 
 lsm_tree_config: 
