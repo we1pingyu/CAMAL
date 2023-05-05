@@ -192,8 +192,6 @@ int main(int argc, char *argv[])
 
     spdlog::info("Building DB: {}", env.db_path);
     rocksdb::Options rocksdb_opt;
-    // rocksdb_opt.memtable_factory.reset(rocksdb::NewHashSkipListRepFactory());
-    // rocksdb_opt.db = rocksdb::NewInMemoryDbOptions();
 
     rocksdb_opt.create_if_missing = true;
     rocksdb_opt.error_if_exists = true;
@@ -253,6 +251,7 @@ int main(int argc, char *argv[])
                 tiered_opt.size_ratio,
                 tiered_opt.levels));
     }
+    table_options.block_size = 4 * env.E;
     // table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(env.bits_per_element));
     if (env.cache_cap == 0)
         table_options.no_block_cache = true;
