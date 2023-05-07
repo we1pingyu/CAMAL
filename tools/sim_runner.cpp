@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
                 tiered_opt.size_ratio,
                 tiered_opt.levels));
     }
-    table_options.block_size = 4 * env.E;
+    // table_options.block_size = 4 * env.E;
     // table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(env.bits_per_element));
     if (env.cache_cap == 0)
         table_options.no_block_cache = true;

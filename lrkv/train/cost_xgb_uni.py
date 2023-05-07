@@ -23,7 +23,7 @@ M = 2147483648  # 256MB
 for num_sample in [15]:
     start_time = time.time()
     print('Start level training')
-    all_samples = pd.read_csv('raw_data/samples_sim_level_uniform_policy.csv')
+    all_samples = pd.read_csv('raw_data/samples_sim_xgb_level_uniform_final.csv')
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
     print(len(all_samples))
@@ -78,8 +78,8 @@ for num_sample in [15]:
     print(np.mean(errors), np.mean(rerrors))
     pickle.dump(regrs, open(f'model/level_cost_xgb_uni_sim.pkl', "wb"))
     print(time.time() - start_time)
-    
-    all_samples = pd.read_csv('raw_data/samples_sim_tier_uniform_policy.csv')
+
+    all_samples = pd.read_csv('raw_data/samples_sim_xgb_tier_uniform_final.csv')
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
     X = []

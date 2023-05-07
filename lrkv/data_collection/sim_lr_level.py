@@ -44,7 +44,7 @@ workloads = [
 M = 2147483648  # 256MB
 n_estimators = 100
 N = 1e7
-queries = 200000
+queries = 20000
 fold = 10
 
 
@@ -52,8 +52,9 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
-        self.scaling = 8 / 1024
-        self.sampels = 3
+        self.scaling_E = 8 / 1024
+        self.scaling_N = 1 / 10
+        self.sampels = 10
 
     def single_run(
         self,
@@ -100,9 +101,9 @@ class LevelCost(object):
             row['path_db'],
             row['h'],
             row['T'],
-            row['N'],
-            int(row['E'] * self.scaling),
-            buffer * self.scaling + (bpe * n),
+            row['N'] * self.scaling_N,
+            int(row['E'] * self.scaling_E),
+            buffer * self.scaling_E * self.scaling_N + (bpe * n * self.scaling_N),
             z0,
             z1,
             q,
@@ -111,7 +112,7 @@ class LevelCost(object):
             skew,
             queries,
             is_leveling_policy=row['is_leveling_policy'],
-            cache_cap=cache_cap * self.scaling,
+            cache_cap=cache_cap * self.scaling_E,
             key_log=key_log,
         )
 
@@ -229,7 +230,7 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['lr_level_ckpt'])
                 step += 1
 
             # iter model
@@ -295,7 +296,7 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['lr_level_ckpt'])
                 step += 1
             # iter model
             X = []
@@ -356,11 +357,11 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['level_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['lr_level_ckpt'])
                 step += 1
 
         self.logger.info('Exporting data from active learning level cost')
-        pd.DataFrame(df).to_csv(self.config['samples_path']['level_final'])
+        pd.DataFrame(df).to_csv(self.config['samples_path']['lr_level_final'])
         self.logger.info(f'Finished al_level_cost, use {time.time()-start_time}s\n')
 
 

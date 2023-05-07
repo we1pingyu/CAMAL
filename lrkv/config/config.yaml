@@ -5,10 +5,10 @@ app:
     ROOT_DIR: "lrkv"
     DATA_DIR: "data"
 
-    # EXECUTION_PATH: "build/db_runner"
-    EXECUTION_PATH: "build/sim_runner"
-    # DATABASE_PATH: "/tmp"
-    DATABASE_PATH: "/dev/shm"
+    EXECUTION_PATH: "build/db_runner"
+    # EXECUTION_PATH: "build/sim_runner"
+    DATABASE_PATH: "/tmp"
+    # DATABASE_PATH: "/dev/shm"
     KEY_FILE_PATH: "data/keys.data"
 
 lsm_tree_config: 
@@ -39,10 +39,14 @@ xgb_model:
     tier_xgb_cost_model: "model/tier_cost_xgb_uni_sim.pkl"
 
 samples_path:
-    level_ckpt: "raw_data/samples_sim_level_uniform_ckpt.csv"
-    level_final: "raw_data/samples_sim_level_uniform_policy.csv"
-    tier_ckpt: "raw_data/samples_sim_tier_uniform_ckpt.csv"
-    tier_final: "raw_data/samples_sim_tier_uniform_policy.csv"
+    lr_level_ckpt: "raw_data/samples_sim_lr_level_uniform_ckpt.csv"
+    lr_level_final: "raw_data/samples_sim_lr_level_uniform_final.csv"
+    lr_tier_ckpt: "raw_data/samples_sim_lr_tier_uniform_ckpt.csv"
+    lr_tier_final: "raw_data/samples_sim_lr_tier_uniform_final.csv"
+    xgb_level_ckpt: "raw_data/samples_sim_xgb_level_uniform_ckpt.csv"
+    xgb_level_final: "raw_data/samples_sim_xgb_level_uniform_final.csv"
+    xgb_tier_ckpt: "raw_data/samples_sim_xgb_tier_uniform_ckpt.csv"
+    xgb_tier_final: "raw_data/samples_sim_xgb_tier_uniform_final.csv"
 
 optimizer_path:
     ckpt: "optimizer_data/optimizer_sim_uniform_ckpt.csv"

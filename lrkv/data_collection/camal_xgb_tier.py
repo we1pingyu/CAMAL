@@ -48,6 +48,7 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
+        self.sampels = 3
 
     def single_run(
         self,
@@ -190,18 +191,9 @@ class LevelCost(object):
                 if err < min_err:
                     min_err = err
                     temp = T
-            # T_list = [2]
-            # k = 0
-            # m = 0
-            # print(temp)
-            # while len(T_list) < 4:
-            #     x = temp + m * pow(-1, k)
-            #     print(m, k, m * pow(-1, k), x)
-            #     if x >= 2 and x < (estimate_T(N, M / 2 / 8, 1) + 1) and x not in T_list:
-            #         T_list.append(x)
-            #     m += 1
-            #     k += 1
-            T_list = self.sample_around_x0(temp, 6, 2, estimate_T(N, M / 2 / 8, 1) + 1)
+            T_list = self.sample_around_x0(
+                temp, self.sampels, 2, estimate_T(N, M / 2 / 8, 1) + 1
+            )
             print(T_list)
             z0, z1, q, w = workload
             ratio = 1.0
@@ -227,7 +219,7 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv('raw_data/al_xgb_level_cost_ckpt.csv')
+                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
 
             # iter model
@@ -258,15 +250,7 @@ class LevelCost(object):
                     min_err = err
                     temp = h
             h_list = []
-            # k = 0
-            # m = 0
-            # while len(h_list) < 4:
-            #     x = temp + m * (-1) ^ k
-            #     if x >= 1 and x <= 16 and x not in h_list:
-            #         T_list.append(x)
-            #     m += 1
-            #     k += 1
-            h_list = self.sample_around_x0(temp, 6, 2, 15)
+            h_list = self.sample_around_x0(temp, self.sampels, 2, 15)
             print(h_list)
             for h in h_list:
                 buffer = ratio * (M - h * N)
@@ -287,7 +271,7 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv('raw_data/al_xgb_level_cost_ckpt.csv')
+                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
             # iter model
             X = []
@@ -333,21 +317,20 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv('raw_data/al_xgb_level_cost_ckpt.csv')
+                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
 
         self.logger.info('Exporting data from active learning level cost')
-        pd.DataFrame(df).to_csv('raw_data/camal_a_xgb_tier_6.csv')
+        pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_final'])
         self.logger.info(f'Finished al_tier_cost, use {time.time()-start_time}s\n')
 
 
 if __name__ == "__main__":
-
     # Load configuration
     if len(sys.argv) > 1:
         config_yaml_path = sys.argv[1]
     else:
-        config_yaml_path = os.path.join('lrkv/config/robust-lsm-trees.yaml')
+        config_yaml_path = os.path.join('lrkv/config/config.yaml')
 
     with open(config_yaml_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)

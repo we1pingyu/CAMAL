@@ -48,6 +48,7 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
+        self.scaling = 8 / 1024
         self.sampels = 3
 
     def single_run(
@@ -78,7 +79,7 @@ class LevelCost(object):
         row['dist'] = dist
         row['skew'] = skew
         row['cache_cap'] = cache_cap
-        row['is_leveling_policy'] = True
+        row['is_leveling_policy'] = False
         row['queries'] = queries
         row['mbuf'] = buffer / 8
         row['z0'] = z0
@@ -95,8 +96,8 @@ class LevelCost(object):
             row['h'],
             row['T'],
             row['N'],
-            row['E'],
-            row['M'],
+            int(row['E'] * self.scaling),
+            buffer * self.scaling + (bpe * n),
             z0,
             z1,
             q,
@@ -105,7 +106,7 @@ class LevelCost(object):
             skew,
             queries,
             is_leveling_policy=row['is_leveling_policy'],
-            cache_cap=cache_cap,
+            cache_cap=cache_cap * self.scaling,
             key_log=key_log,
         )
 
@@ -219,7 +220,7 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
 
             # iter model
@@ -250,7 +251,15 @@ class LevelCost(object):
                     min_err = err
                     temp = h
             h_list = []
-            h_list = self.sample_around_x0(temp, self.sampels, 2, 16)
+            # k = 0
+            # m = 0
+            # while len(h_list) < 4:
+            #     x = temp + m * (-1) ^ k
+            #     if x >= 1 and x <= 16 and x not in h_list:
+            #         T_list.append(x)
+            #     m += 1
+            #     k += 1
+            h_list = self.sample_around_x0(temp, self.sampels, 2, 15)
             print(h_list)
             for h in h_list:
                 buffer = ratio * (M - h * N)
@@ -269,8 +278,9 @@ class LevelCost(object):
                     queries,
                     key_log,
                 )
+                # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
             # iter model
             X = []
@@ -314,13 +324,14 @@ class LevelCost(object):
                     queries,
                     key_log,
                 )
+                # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_ckpt'])
+                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
 
         self.logger.info('Exporting data from active learning level cost')
-        pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_final'])
-        self.logger.info(f'Finished al_level_cost, use {time.time()-start_time}s\n')
+        pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_final'])
+        self.logger.info(f'Finished al_tier_cost, use {time.time()-start_time}s\n')
 
 
 if __name__ == "__main__":

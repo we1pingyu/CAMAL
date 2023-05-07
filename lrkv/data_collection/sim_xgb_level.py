@@ -48,6 +48,7 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
+        self.scaling = 8 / 1024
         self.sampels = 3
 
     def single_run(
@@ -95,8 +96,8 @@ class LevelCost(object):
             row['h'],
             row['T'],
             row['N'],
-            row['E'],
-            row['M'],
+            int(row['E'] * self.scaling),
+            buffer * self.scaling + (bpe * n),
             z0,
             z1,
             q,
@@ -105,7 +106,7 @@ class LevelCost(object):
             skew,
             queries,
             is_leveling_policy=row['is_leveling_policy'],
-            cache_cap=cache_cap,
+            cache_cap=cache_cap * self.scaling,
             key_log=key_log,
         )
 
