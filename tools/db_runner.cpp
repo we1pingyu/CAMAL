@@ -208,7 +208,6 @@ int main(int argc, char *argv[])
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
     tmpdb::TieredCompactor *tiered_compactor = nullptr;
     tmpdb::TieredOptions tiered_opt;
-    spdlog::error("error1");
 
     if (env.compaction_style == "level")
     {
@@ -237,7 +236,6 @@ int main(int argc, char *argv[])
         tiered_compactor = new tmpdb::TieredCompactor(tiered_opt, rocksdb_opt);
         rocksdb_opt.listeners.emplace_back(tiered_compactor);
     }
-    spdlog::error("error2");
     rocksdb::BlockBasedTableOptions table_options;
     if (env.compaction_style == "level")
     {
@@ -266,9 +264,7 @@ int main(int argc, char *argv[])
     rocksdb_opt.statistics = rocksdb::CreateDBStatistics();
     rocksdb::DB *db = nullptr;
     rocksdb::Status status = rocksdb::DB::Open(rocksdb_opt, env.db_path, &db);
-    spdlog::error("error3");
     // db->SetDBOptions({{"stats_level", "kExceptDetailedTimers"}});
-    spdlog::error("error4");
     if (!status.ok())
     {
         spdlog::error("Problems opening DB");

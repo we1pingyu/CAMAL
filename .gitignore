@@ -51,3 +51,4 @@ optimizer_data/
 model/
 plot/
 lrkv/optimizer/test*
+perf*
