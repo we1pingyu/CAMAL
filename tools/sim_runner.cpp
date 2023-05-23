@@ -198,8 +198,8 @@ int main(int argc, char *argv[])
     rocksdb_opt.IncreaseParallelism(env.parallelism);
     rocksdb_opt.compression = rocksdb::kNoCompression;
     rocksdb_opt.bottommost_compression = kNoCompression;
-    // rocksdb_opt.use_direct_reads = true;
-    // rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
+    rocksdb_opt.use_direct_reads = true;
+    rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.advise_random_on_open = false;
     rocksdb_opt.random_access_max_buffer_size = 0;
@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
     if (env.compaction_style == "level")
     {
         rocksdb_opt.write_buffer_size = env.B;
-        rocksdb_opt.level0_file_num_compaction_trigger = 4;
+        rocksdb_opt.level0_file_num_compaction_trigger = 2;
         rocksdb_opt.num_levels = env.max_rocksdb_levels;
         rocksdb_opt.max_bytes_for_level_multiplier = env.T;
         rocksdb_opt.max_bytes_for_level_base =
