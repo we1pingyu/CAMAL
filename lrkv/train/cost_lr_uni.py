@@ -19,9 +19,9 @@ B = 4
 S = 2
 M = 2147483648  # 256MB
 
-for num_sample in [15]:
+for num_sample in [8]:
     start_time = time.time()
-    all_samples = pd.read_csv('raw_data/samples_sim_lr_level_uniform_final.csv')
+    all_samples = pd.read_csv('raw_data/samples_safe_level_uniform_ckpt.csv')
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
     Xc = []
@@ -109,7 +109,7 @@ for num_sample in [15]:
     pkl.dump(Ws, open(f'model/level_cost_lr_uniform_sim.pkl', "wb"))
     print(time.time() - start_time)
 
-    all_samples = pd.read_csv('raw_data/samples_sim_lr_tier_uniform_final.csv')
+    all_samples = pd.read_csv('raw_data/samples_safe_tiering_uniform_ckpt.csv')
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
 

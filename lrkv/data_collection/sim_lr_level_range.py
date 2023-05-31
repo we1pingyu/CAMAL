@@ -8,11 +8,12 @@ import random
 import sys
 import os
 import yaml
+import ast
 from sklearn.model_selection import KFold
 
 sys.path.append('./lrkv')
 from runner import Runner
-from lsm_tree.PyRocksDB import RocksDB
+from lsm_tree.PySim import RocksDB
 from lsm_tree.cost_function import CostFunction
 from utils.model_lr import (
     get_level_cost,
@@ -45,7 +46,7 @@ workloads = [
 M = 2147483648  # 256MB
 n_estimators = 100
 N = 1e7
-queries = 100000
+queries = 200000
 fold = 10
 
 
@@ -67,6 +68,9 @@ class LevelCost(object):
         cache_cap,
         queries,
         key_log,
+        kv_size=8192,
+        scaling=1.0,
+        path_db='/tmp',
     ):
         z0, z1, q, w = workload
         self.logger.info(f'Workload : {z0},{z1},{q},{w}')
@@ -74,24 +78,23 @@ class LevelCost(object):
         row = self.config['lsm_tree_config'].copy()
 
         row['db_name'] = 'level_cost'
-        row['path_db'] = self.config['app']['DATABASE_PATH']
+        row['path_db'] = path_db
         buffer = buffer
         row['T'] = size_ratio
         row['N'] = n
-        row['M'] = buffer + (bpe * n)
+        row['M'] = buffer * scaling + (bpe * n)
         row['h'] = bpe
         row['dist'] = dist
         row['skew'] = skew
-        row['cache_cap'] = cache_cap
+        row['cache_cap'] = cache_cap * scaling
         row['is_leveling_policy'] = True
         row['queries'] = queries
-        row['mbuf'] = buffer
+        row['mbuf'] = buffer * scaling
         row['z0'] = z0
         row['z1'] = z1
         row['q'] = q
         row['w'] = w
         db = RocksDB(self.config)
-
         self.logger.info('Running workload')
         row['key_log'] = key_log
         results = db.run(
@@ -100,7 +103,7 @@ class LevelCost(object):
             row['h'],
             row['T'],
             row['N'],
-            row['E'],
+            kv_size,
             row['M'],
             z0,
             z1,
@@ -112,6 +115,7 @@ class LevelCost(object):
             is_leveling_policy=row['is_leveling_policy'],
             cache_cap=cache_cap,
             key_log=key_log,
+            scaling=scaling,
         )
 
         for key, val in results.items():
@@ -136,7 +140,8 @@ class LevelCost(object):
         row['q'] = q
         row['w'] = w
         row['ratio'] = ratio
-        row['actual_runs'] = len([i for i in row['files_per_level'] if i != 0])
+        files_per_level = ast.literal_eval(row['files_per_level'])
+        row['actual_runs'] = len([i for i in files_per_level if i != 0])
         row['write_io'] = (
             row['bytes_written']
             + row['compact_read']
@@ -147,6 +152,7 @@ class LevelCost(object):
         row['read_model_io'] = queries * cf.calculate_read_cost(row['h'], row['T'])
         row['write_model_io'] = queries * cf.calculate_write_cost(row['h'], row['T'])
         row['model_io'] = row['read_model_io'] + row['write_model_io']
+        self.logger.info('actual_runs: {}'.format(row['actual_runs']))
         self.logger.info('mbuf: {}'.format(row['mbuf']))
         self.logger.info('read_model_io: {}'.format(row['read_model_io']))
         self.logger.info('write_model_io: {}'.format(row['write_model_io']))
@@ -185,16 +191,11 @@ class LevelCost(object):
         if not os.path.exists(key_path):
             os.makedirs(key_path)
         step = 0
-        eps = 1e-7
-        num_samples = 3
-        X = []
-        Y = []
-        Xc = []
-        Yc = []
+
         for step in range(100):
             for workload in workloads:
                 # z0, z1, q, w = workload
-                size_ratio = random.randint(2, 70)
+                size_ratio = random.choice([2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 32, 64])
                 ratio = random.uniform(0.5, 1)
                 dist = 'uniform'
                 skew = 0.0
@@ -202,6 +203,7 @@ class LevelCost(object):
                 buffer = ratio * (M - bpe * N)
                 cache_cap = 0.0
                 key_log = key_path + '/{}.dat'.format(step)
+                # original
                 row = self.single_run(
                     workload,
                     size_ratio,
@@ -214,6 +216,29 @@ class LevelCost(object):
                     cache_cap,
                     queries,
                     key_log,
+                )
+                # print(row)
+                df.append(row)
+                pd.DataFrame(df).to_csv(
+                    "raw_data/samples_sim_lr_level_uniform_range_ckpt.csv"
+                )
+
+                # scaling
+                row = self.single_run(
+                    workload,
+                    size_ratio,
+                    ratio,
+                    N,
+                    buffer,
+                    bpe,
+                    dist,
+                    skew,
+                    cache_cap,
+                    queries,
+                    key_log,
+                    kv_size=8 * 8,
+                    scaling=32 / 1052,
+                    path_db='/dev/shm',
                 )
                 # print(row)
                 df.append(row)

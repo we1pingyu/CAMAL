@@ -8,8 +8,10 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "table/merging_iterator.h"
+
 #include <string>
 #include <vector>
+
 #include "db/dbformat.h"
 #include "db/pinned_iterators_manager.h"
 #include "memory/arena.h"
@@ -304,10 +306,7 @@ class MergingIterator : public InternalIterator {
   // If any of the children have non-ok status, this is one of them.
   Status status_;
   // Which direction is the iterator moving?
-  enum Direction {
-    kForward,
-    kReverse
-  };
+  enum Direction { kForward, kReverse };
   Direction direction_;
   MergerMinIterHeap minHeap_;
   bool prefix_seek_mode_;
