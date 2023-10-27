@@ -37,10 +37,10 @@ workloads = [
     (0.01, 0.33, 0.33, 0.33),
 ]
 
-M = 2147483648  # 256MB
+M = 214748364.8  # 256MB
 n_estimators = 100
-N = 1e7
-queries = 200000
+N = 1e6
+queries = 20000
 fold = 10
 
 
@@ -48,7 +48,7 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
-        self.sampels = 3
+        self.samples = 3
 
     def single_run(
         self,
@@ -191,9 +191,33 @@ class LevelCost(object):
                 if err < min_err:
                     min_err = err
                     temp = T
-            T_list = self.sample_around_x0(
-                temp, self.sampels, 2, estimate_T(N, M / 2 / 8, 1) + 1
-            )
+            if len(df) == 0:
+                T_list = self.sample_around_x0(
+                    temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1) + 1
+                )
+            else:
+                X = []
+                Y = []
+                for sample in df:
+                    X.append(
+                        get_cost_uniform(
+                            sample['T'],
+                            sample['h'],
+                            sample['ratio'],
+                            sample['z0'],
+                            sample['z1'],
+                            sample['q'],
+                            sample['w'],
+                        )
+                    )
+                    Y.append(sample['total_latency'] / sample['queries'])
+                _X = np.array(X)
+                _Y = np.array(Y)
+                regr = xgb.XGBRegressor()
+                regr.fit(_X, _Y)
+                t = traverse_for_T([regr], z0, z1, q, w, n=-1)
+                T_list = [temp]
+                T_list = weight_sampling(t, 0, self.samples, T_list)
             print(T_list)
             z0, z1, q, w = workload
             ratio = 1.0
@@ -223,6 +247,8 @@ class LevelCost(object):
                 step += 1
 
             # iter model
+            X = []
+            Y = []
             for sample in df:
                 X.append(
                     get_cost_uniform(
@@ -241,16 +267,40 @@ class LevelCost(object):
             regr = xgb.XGBRegressor()
             regr.fit(_X, _Y)
             candidates = traverse_for_T([regr], z0, z1, q, w, n=1)
-            T0 = candidates[0][0]
+            T0 = int((candidates[0][0] + T_list[0]) / 2)
 
             min_err = 1e9
             for h in range(1, 17):
-                err = h_mbuf_level_equation(h, z0, z1, q, w, T0)
+                err = h_mbuf_level_equation(h, z0, z1, q, w, T0, N)
                 if err < min_err:
                     min_err = err
                     temp = h
             h_list = []
-            h_list = self.sample_around_x0(temp, self.sampels, 2, 16)
+            if False:
+                h_list = self.sample_around_x0(temp, self.samples, 2, 15)
+            else:
+                X = []
+                Y = []
+                for sample in df:
+                    X.append(
+                        get_cost_uniform(
+                            sample['T'],
+                            sample['h'],
+                            sample['ratio'],
+                            sample['z0'],
+                            sample['z1'],
+                            sample['q'],
+                            sample['w'],
+                        )
+                    )
+                    Y.append(sample['total_latency'] / sample['queries'])
+                _X = np.array(X)
+                _Y = np.array(Y)
+                regr = xgb.XGBRegressor()
+                regr.fit(_X, _Y)
+                h = traverse_for_h([regr], z0, z1, q, w, T0=T0, n=-1)
+                h_list = [temp]
+                h_list = weight_sampling(h, 1, self.samples, h_list)
             print(h_list)
             for h in h_list:
                 buffer = ratio * (M - h * N)
@@ -293,7 +343,7 @@ class LevelCost(object):
             regr = xgb.XGBRegressor()
             regr.fit(_X, _Y)
             candidates = traverse_for_h([regr], z0, z1, q, w, T0=T0, n=1)
-            h0 = candidates[0][1]
+            h0 = int((candidates[0][1] + h_list[0]) / 2)
 
             min_err = 1e9
             for ratio in [0.7, 0.8, 0.9]:

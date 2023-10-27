@@ -15,9 +15,7 @@ from runner import Runner
 from lsm_tree.PyRocksDB import RocksDB
 from lsm_tree.cost_function import CostFunction
 from utils.model_xgb import get_cost_uniform, traverse_for_T, traverse_for_h
-from utils.distribution import dist_regression, generate_key_log
-from utils.lsm import *
-from utils.model_xgb import get_candidate_simulated_annealing, get_cost, get_cache
+
 
 workloads = [
     (0.25, 0.25, 0.25, 0.25),

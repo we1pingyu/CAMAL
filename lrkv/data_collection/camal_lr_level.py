@@ -41,10 +41,10 @@ workloads = [
     (0.01, 0.33, 0.33, 0.33),
 ]
 
-M = 2147483648  # 256MB
+M = 214748364.8  # 256MB
 n_estimators = 100
-N = 1e7
-queries = 200000
+N = 1e6
+queries = 20000
 fold = 10
 
 
@@ -52,6 +52,7 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
+        self.samples = 3
 
     def single_run(
         self,
@@ -183,7 +184,6 @@ class LevelCost(object):
             os.makedirs(key_path)
         step = 0
         eps = 1e-7
-        num_samples = 3
         X = []
         Y = []
         Xc = []
@@ -197,7 +197,49 @@ class LevelCost(object):
                 if err < min_err:
                     min_err = err
                     temp = T
-            T_list = self.sample_around_x0(temp, 3, 2, estimate_T(N, M / 2 / 8, 1))
+            if len(df) == 0:
+                T_list = self.sample_around_x0(
+                    temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1)
+                )
+            else:
+                X = []
+                Y = []
+                Xc = []
+                Yc = []
+                for sample in df:
+                    xc = get_cache_uniform(
+                        sample['T'],
+                        sample['h'],
+                        sample['ratio'],
+                        sample['z0'],
+                        sample['z1'],
+                        sample['q'],
+                        sample['w'],
+                    )
+                    Xc.append(xc)
+                    Yc.append(np.log(sample['cache_hit_rate'] + eps))
+                    X.append(
+                        get_level_cost(
+                            sample['T'],
+                            sample['h'],
+                            sample['ratio'],
+                            sample['z0'],
+                            sample['z1'],
+                            sample['q'],
+                            sample['w'],
+                            sample['cache_hit_rate'],
+                        )
+                    )
+                    Y.append(sample['total_latency'] / sample['queries'])
+                _Xc = np.array(Xc)
+                _Yc = np.array(Yc)
+                Wc = np.linalg.lstsq(_Xc, _Yc, rcond=-1)[0]
+                _X = np.array(X)
+                _Y = np.array(Y)
+                W = np.linalg.lstsq(_X, _Y, rcond=-1)[0]
+                t = traverse_for_T([W], [Wc], z0, z1, q, w, n=-1, policy='level')
+                T_list = [temp]
+                T_list = weight_sampling(t, 0, self.samples, T_list)
             print(T_list)
             # continue
             z0, z1, q, w = workload
@@ -228,6 +270,10 @@ class LevelCost(object):
                 step += 1
 
             # iter model
+            X = []
+            Y = []
+            Xc = []
+            Yc = []
             for sample in df:
                 xc = get_cache_uniform(
                     sample['T'],
@@ -260,15 +306,55 @@ class LevelCost(object):
             _Y = np.array(Y)
             W = np.linalg.lstsq(_X, _Y, rcond=-1)[0]
             candidates = traverse_for_T([W], [Wc], z0, z1, q, w, n=1, policy='level')
-            T0 = candidates[0][0]
+            T0 = int((candidates[0][0] + T_list[0]) / 2)
 
             min_err = 1e9
             for h in range(1, 17):
-                err = h_mbuf_level_equation(h * N, z0, z1, q, w, T0)
+                err = h_mbuf_level_equation(h * N, z0, z1, q, w, T0, N)
                 if err < min_err:
                     min_err = err
                     temp = h
-            h_list = self.sample_around_x0(temp, 3, 1, 16)
+            if False:
+                h_list = self.sample_around_x0(temp, self.samples, 2, 15)
+            else:
+                X = []
+                Y = []
+                Xc = []
+                Yc = []
+                for sample in df:
+                    xc = get_cache_uniform(
+                        sample['T'],
+                        sample['h'],
+                        sample['ratio'],
+                        sample['z0'],
+                        sample['z1'],
+                        sample['q'],
+                        sample['w'],
+                    )
+                    Xc.append(xc)
+                    Yc.append(np.log(sample['cache_hit_rate'] + eps))
+                    X.append(
+                        get_level_cost(
+                            sample['T'],
+                            sample['h'],
+                            sample['ratio'],
+                            sample['z0'],
+                            sample['z1'],
+                            sample['q'],
+                            sample['w'],
+                            sample['cache_hit_rate'],
+                        )
+                    )
+                    Y.append(sample['total_latency'] / sample['queries'])
+                _Xc = np.array(Xc)
+                _Yc = np.array(Yc)
+                Wc = np.linalg.lstsq(_Xc, _Yc, rcond=-1)[0]
+                _X = np.array(X)
+                _Y = np.array(Y)
+                W = np.linalg.lstsq(_X, _Y, rcond=-1)[0]
+                h = traverse_for_h([W], [Wc], z0, z1, q, w, T0=T0, n=-1, policy='level')
+                h_list = [temp]
+                h_list = weight_sampling(h, 1, self.samples, h_list)
             print(h_list)
             for h in h_list:
                 buffer = ratio * M - h * N
@@ -292,9 +378,12 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config['samples_path']['lr_level_ckpt'])
                 step += 1
+
             # iter model
             X = []
             Y = []
+            Xc = []
+            Yc = []
             for sample in df:
                 xc = get_cache_uniform(
                     sample['T'],
@@ -327,9 +416,10 @@ class LevelCost(object):
             _Y = np.array(Y)
             W = np.linalg.lstsq(_X, _Y, rcond=-1)[0]
             candidates = traverse_for_h([W], [Wc], z0, z1, q, w, n=1, policy='level')
-            h0 = candidates[0][1]
+            h0 = int((candidates[0][1] + h_list[0]) / 2)
 
             min_err = 1e9
+            print(T0, h0)
             for ratio in [0.8, 0.9]:
                 buffer = ratio * (M - h0 * N)
                 h0 = ratio * h0

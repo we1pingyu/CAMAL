@@ -5,6 +5,8 @@ import pickle
 import sys
 import random
 import time
+import os
+from datetime import datetime
 
 sys.path.append('./lrkv')
 from sklearn.model_selection import train_test_split
@@ -15,15 +17,18 @@ from sklearn.model_selection import KFold
 np.set_printoptions(suppress=True)
 
 E = 1024
-Q = 200000
+Q = 20000
 B = 4
 S = 2
-M = 2147483648  # 256MB
+M = 214748364.8  # 256MB
 
-for num_sample in [15]:
+for num_sample in [20]:
     start_time = time.time()
     print('Start level training')
     all_samples = pd.read_csv('raw_data/samples_sim_xgb_level_uniform_final.csv')
+    timestamp = os.path.getctime('raw_data/samples_sim_xgb_level_uniform_final.csv')
+    creation_time = datetime.fromtimestamp(timestamp)
+    print(creation_time)
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
     print(len(all_samples))
@@ -44,6 +49,8 @@ for num_sample in [15]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
+                M,
+                sample['N'],
             )
         )
         y = sample['total_latency'] / sample['queries']
@@ -80,6 +87,9 @@ for num_sample in [15]:
     print(time.time() - start_time)
 
     all_samples = pd.read_csv('raw_data/samples_sim_xgb_tier_uniform_final.csv')
+    timestamp = os.path.getctime('raw_data/samples_sim_xgb_tier_uniform_final.csv')    
+    creation_time = datetime.fromtimestamp(timestamp)
+    print(creation_time)
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
     X = []
@@ -97,6 +107,8 @@ for num_sample in [15]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
+                M,
+                sample['N'],
             )
         )
         y = sample['total_latency'] / sample['queries']

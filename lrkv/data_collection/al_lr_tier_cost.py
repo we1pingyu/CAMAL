@@ -12,9 +12,8 @@ from sklearn.model_selection import KFold
 sys.path.append('./lrkv')
 from runner import Runner
 from lsm_tree.PyRocksDB import RocksDB
-from lsm_tree.cost_function import NominalCostFunction
+from lsm_tree.cost_function import CostFunction
 from utils.distribution import dist_regression, generate_key_log
-from utils.lsm import estimate_fpr, estimate_level
 from utils.model_lr import get_tier_cost, get_cache, get_candidate_simulated_annealing
 
 workloads = [
@@ -111,7 +110,7 @@ class TierCost(object):
         for key, val in results.items():
             self.logger.info(f'{key} : {val}')
             row[f'{key}'] = val
-        cf = NominalCostFunction(
+        cf = CostFunction(
             row['N'],
             row['phi'],
             row['s'],
@@ -377,7 +376,6 @@ class TierCost(object):
 
 
 if __name__ == "__main__":
-
     # Load configuration
     if len(sys.argv) > 1:
         config_yaml_path = sys.argv[1]

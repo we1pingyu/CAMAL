@@ -14,10 +14,10 @@ from sklearn.linear_model import LinearRegression
 np.set_printoptions(suppress=True)
 
 E = 1024
-Q = 200000
+Q = 20000
 B = 4
 S = 2
-M = 2147483648  # 256MB
+M = 214748364.8  # 256MB
 
 for num_sample in [15]:
     start_time = time.time()
@@ -45,6 +45,8 @@ for num_sample in [15]:
             sample['z1'],
             sample['q'],
             sample['w'],
+            M,
+            sample['N'],
         )
         Xc.append(xc)
         Yc.append(np.log(sample['cache_hit_rate'] + eps))
@@ -58,6 +60,8 @@ for num_sample in [15]:
                 sample['q'],
                 sample['w'],
                 sample['cache_hit_rate'],
+                M,
+                sample['N'],
             )
         )
         y = (sample['total_latency']) / sample['queries']
@@ -65,6 +69,7 @@ for num_sample in [15]:
 
     Xc = np.array(Xc)
     Yc = np.array(Yc)
+    print(Xc.shape)
     Wc = np.linalg.lstsq(Xc, Yc, rcond=-1)[0]
 
     X = np.array(X)
@@ -105,8 +110,8 @@ for num_sample in [15]:
             rerrors.append(_rerror)
     print('=' * 50)
     print(np.mean(errors), np.mean(rerrors))
-    pkl.dump(Wcs, open(f'model/level_cache_lr_uniform_sim.pkl', "wb"))
-    pkl.dump(Ws, open(f'model/level_cost_lr_uniform_sim.pkl', "wb"))
+    pkl.dump(Wcs, open(f'model/level_lr_sim_cache_model.pkl', "wb"))
+    pkl.dump(Ws, open(f'model/level_lr_sim_cost_model.pkl', "wb"))
     print(time.time() - start_time)
 
     all_samples = pd.read_csv('raw_data/samples_sim_lr_tier_uniform_final.csv')
@@ -134,6 +139,8 @@ for num_sample in [15]:
             sample['z1'],
             sample['q'],
             sample['w'],
+            M,
+            sample['N'],
         )
         Xc.append(xc)
         Yc.append(np.log(sample['cache_hit_rate'] + eps))
@@ -147,6 +154,8 @@ for num_sample in [15]:
                 sample['q'],
                 sample['w'],
                 sample['cache_hit_rate'],
+                M,
+                sample['N'],
             )
         )
         y = (sample['total_latency']) / sample['queries']
@@ -194,5 +203,5 @@ for num_sample in [15]:
             rerrors.append(_rerror)
     print('=' * 50)
     print(np.mean(errors), np.mean(rerrors))
-    pkl.dump(Wcs, open(f'model/tier_cache_lr_uniform_sim.pkl', "wb"))
-    pkl.dump(Ws, open(f'model/tier_cost_lr_uniform_sim.pkl', "wb"))
+    pkl.dump(Wcs, open(f'model/tier_lr_sim_cache_model.pkl', "wb"))
+    pkl.dump(Ws, open(f'model/tier_lr_sim_cost_model.pkl', "wb"))

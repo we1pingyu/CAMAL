@@ -19,12 +19,12 @@ from utils.distribution import dist_regression
 
 np.set_printoptions(suppress=True)
 
-N = 1e7
+N = 1e7 / 10
 E = 1024
-Q = 200000
+Q = int(200000 / 10)
 B = 4
 S = 2
-M = 2147483648  # 256MB
+M = 2147483648 / 10  # 256MB
 workloads = [
     (0.25, 0.25, 0.25, 0.25),
     (0.97, 0.01, 0.01, 0.01),
@@ -82,6 +82,11 @@ class Optimizer(object):
         i = -1
         df = []
         # workloads = [(0.01, 0.01, 0.97, 0.01), (0.01, 0.01, 0.01, 0.97)]
+        non_t = []
+        non_cache_t = []
+        rocksdb_t = []
+        lr_t = []
+        xgb_t = []
         for workload in workloads:
             i += 1
             # workload = [random.random() for _ in range(4)]
@@ -171,6 +176,7 @@ class Optimizer(object):
             # print(row)
             df.append(row)
             pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
+            non_t.append(row['total_latency'])
 
             # nominal + default cache optimizer
             row = copy.deepcopy(row)
@@ -256,6 +262,7 @@ class Optimizer(object):
             # print(row)
             df.append(row)
             pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
+            non_cache_t.append(row['total_latency'])
 
             # rocksdb default setting
             row = copy.deepcopy(row)
@@ -301,16 +308,23 @@ class Optimizer(object):
             # print(row)
             df.append(row)
             pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
+            rocksdb_t.append(row['total_latency'])
 
             # learned lr optimizer
             row = copy.deepcopy(row)
             row['optimizer'] = 'lr'
-            level_cost_models = pkl.load(open(f"model/level_cost_lr_uniform.pkl", "rb"))
-            level_cache_models = pkl.load(
-                open(f"model/level_cache_lr_uniform.pkl", "rb")
+            level_cost_models = pkl.load(
+                open(self.config['lr_model']['level_lr_cost_model'], "rb")
             )
-            tier_cost_models = pkl.load(open(f"model/tier_cost_lr_uniform.pkl", "rb"))
-            tier_cache_models = pkl.load(open(f"model/tier_cache_lr_uniform.pkl", "rb"))
+            level_cache_models = pkl.load(
+                open(self.config['lr_model']['level_lr_cache_model'], "rb")
+            )
+            tier_cost_models = pkl.load(
+                open(self.config['lr_model']['tier_lr_cost_model'], "rb")
+            )
+            tier_cache_models = pkl.load(
+                open(self.config['lr_model']['tier_lr_cache_model'], "rb")
+            )
             (
                 best_T,
                 best_h,
@@ -318,7 +332,7 @@ class Optimizer(object):
                 best_var,
                 best_cost,
             ) = model_lr.traverse_var_optimizer_uniform(
-                level_cache_models, level_cost_models, z0, z1, q, w, N=N
+                level_cache_models, level_cost_models, z0, z1, q, w
             )
             row['is_leveling_policy'] = True
             (
@@ -335,7 +349,6 @@ class Optimizer(object):
                 q,
                 w,
                 policy='tier',
-                N=N,
             )
             print(
                 f'level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio},best_var: {best_var}, best_cost:{best_cost}'
@@ -395,6 +408,7 @@ class Optimizer(object):
             # print(row)
             df.append(row)
             pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
+            lr_t.append(row['total_latency'])
 
             # learned xgb optimizer
             row = copy.deepcopy(row)
@@ -412,7 +426,7 @@ class Optimizer(object):
                 _,
                 best_cost,
             ) = model_xgb.traverse_var_optimizer_uniform(
-                level_cost_models, 1, z0, z1, q, w, N=N
+                level_cost_models, 1, z0, z1, q, w
             )
             row['is_leveling_policy'] = True
             (
@@ -422,7 +436,7 @@ class Optimizer(object):
                 _,
                 tier_best_cost,
             ) = model_xgb.traverse_var_optimizer_uniform(
-                tier_cost_models, 0, z0, z1, q, w, N=N
+                tier_cost_models, 0, z0, z1, q, w
             )
             print(
                 f'level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, best_cost:{best_cost}'
@@ -449,7 +463,6 @@ class Optimizer(object):
             row['cache_cap'] = (1 - best_ratio) * M / 8
             self.logger.info(f'Building DB at size : {N}')
             db = RocksDB(self.config)
-
             results = db.run(
                 row['db_name'],
                 row['path_db'],
@@ -483,6 +496,12 @@ class Optimizer(object):
             # print(row)
             df.append(row)
             pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
+            xgb_t.append(row['total_latency'])
+            print('non_t: ', np.mean(non_t))
+            print('non_cache_t: ', np.mean(non_cache_t))
+            print('rocksdb_t: ', np.mean(rocksdb_t))
+            print('lr_t: ', np.mean(lr_t))
+            print('xgb_t: ', np.mean(xgb_t))
         self.logger.info('Exporting data from lr optimizer')
         pd.DataFrame(df).to_csv(self.config['optimizer_path']['final'])
         self.logger.info('Finished optimizer\n')

@@ -9,6 +9,8 @@ import time
 sys.path.append('./lrkv')
 from utils.lsm import estimate_level, estimate_fpr
 
+eps = 1e-5
+
 
 def prepare_df(samples, save_path):
     df = []
@@ -64,7 +66,7 @@ def load_models(model_path, folds=10):
 
 
 def get_cache(
-    current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, M=2147483648, N=1e7
+    current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, M=.2147483648, N=1e6
 ):
     fpr = estimate_fpr(current_h)
     buffer = current_ratio * (M - current_h * N)
@@ -82,8 +84,8 @@ def get_cost_uniform(
     z1,
     q,
     w,
-    M=2147483648,
-    N=1e7,
+    M=214748364.8,
+    N=1e6,
 ):
     h = current_ratio * current_h
     fpr = estimate_fpr(h)
@@ -105,8 +107,8 @@ def get_cost(
     q,
     w,
     y_cache,
-    M=2147483648,
-    N=1e7,
+    M=214748364.8,
+    N=1e6,
 ):
     fpr = estimate_fpr(current_h)
     buffer = current_ratio * (M - current_h * N)
@@ -115,7 +117,7 @@ def get_cost(
     return [alpha, c, z0, z1, q, w, current_T, l, fpr, cache_cap, buffer, y_cache]
 
 
-def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e7):
+def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e6):
     start_time = time.time()
     costs = []
     xs = []
@@ -139,7 +141,7 @@ def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e7):
 
 
 def traverse_var_optimizer_uniform_T(
-    cost_models, policy, z0, z1, q, w, M=2147483648, N=1e7
+    cost_models, policy, z0, z1, q, w, M=214748364.8, N=1e6
 ):
     start_time = time.time()
     costs = []
@@ -164,7 +166,7 @@ def traverse_var_optimizer_uniform_T(
 
 
 def traverse_var_optimizer_uniform_memory(
-    cost_models, policy, z0, z1, q, w, M=2147483648, N=1e7
+    cost_models, policy, z0, z1, q, w, M=214748364.8, N=1e6
 ):
     start_time = time.time()
     costs = []
@@ -188,7 +190,7 @@ def traverse_var_optimizer_uniform_memory(
     return candidate[1][0], candidate[1][1], candidate[1][2], None, candidate[0]
 
 
-def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e7, n=10):
+def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e6, n=10):
     candidates = []
     for T in range(2, 78):
         h = h0
@@ -196,7 +198,9 @@ def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e7, n=10):
         costs = []
         for cost_model in cost_models:
             x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
-            costs.append(cost_model.predict([x])[0])
+            costs.append(
+                max(cost_model.predict(np.array([x]).reshape((1, -1)))[0], eps)
+            )
         candidates.append([T, h, ratio, np.var(costs), np.mean(costs)])
     candidates.sort(key=lambda x: x[-1])
     # candidates = candidates[:10]
@@ -204,7 +208,7 @@ def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e7, n=10):
     return candidates[:n]
 
 
-def traverse_for_h(cost_models, z0, z1, q, w, T0=10, ratio0=1.0, N=1e7, n=10):
+def traverse_for_h(cost_models, z0, z1, q, w, T0=10, ratio0=1.0, N=1e6, n=10):
     candidates = []
     for h in range(1, 16):
         T = T0
@@ -212,7 +216,9 @@ def traverse_for_h(cost_models, z0, z1, q, w, T0=10, ratio0=1.0, N=1e7, n=10):
         costs = []
         for cost_model in cost_models:
             x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
-            costs.append(cost_model.predict([x])[0])
+            costs.append(
+                max(cost_model.predict(np.array([x]).reshape((1, -1)))[0], eps)
+            )
         candidates.append([T, h, ratio, np.var(costs), np.mean(costs)])
     candidates.sort(key=lambda x: x[-1])
     # candidates = candidates[:10]
@@ -292,7 +298,9 @@ def get_candidate_simulated_annealing(
     # )
     current_costs = []
     for cost_model in cost_models:
-        current_costs.append(cost_model.predict([x_cache])[0])
+        current_costs.append(
+            max(cost_model.predict(np.array([x_cache]).reshape((1, -1)))[0], eps)
+        )
     current_cost = np.mean(current_costs)
     best_T, best_h, best_ratio = current_T, current_h, current_ratio
     best_cost = current_cost
@@ -307,7 +315,11 @@ def get_candidate_simulated_annealing(
             # x_cost = get_cost(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w, y_cache)
             new_costs = []
             for cost_model in cost_models:
-                new_costs.append(cost_model.predict([x_cache])[0])
+                new_costs.append(
+                    max(
+                        cost_model.predict(np.array([x_cache]).reshape((1, -1)))[0], eps
+                    )
+                )
             new_cost = np.mean(new_costs)
             delta_cost = new_cost - current_cost
             if delta_cost < 0:
