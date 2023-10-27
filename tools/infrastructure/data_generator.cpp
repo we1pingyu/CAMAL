@@ -142,10 +142,10 @@ YCSBGenerator::YCSBGenerator(int num_keys, std::string mode, double zipfian_skew
     {
         v.push_back(i);
     }
-    // std::shuffle(v.begin(), v.end(), std::default_random_engine(time(0)));
+    // std::shuffle(v.begin(), v.end(), std::default_random_engine(0));
     this->existing_keys = v;
     this->keys = v;
-    this->engine = std::mt19937();
+    // this->engine = std::mt19937();
     this->key_gen = this->existing_keys.begin();
     if (mode == "uniform")
     {

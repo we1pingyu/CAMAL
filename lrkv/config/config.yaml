@@ -49,5 +49,5 @@ samples_path:
     xgb_tier_final: "raw_data/samples_sim_xgb_tier_uniform_final.csv"
 
 optimizer_path:
-    ckpt: "optimizer_data/optimizer_sim_uniform_ckpt.csv"
-    final: "optimizer_data/optimizer_sim_uniform_final.csv"
+    ckpt: "optimizer_data/optimizer_sim_uniform_ckpt_.csv"
+    final: "optimizer_data/optimizer_sim_uniform_final_.csv"

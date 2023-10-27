@@ -60,6 +60,8 @@ typedef struct environment
     std::string key_log_file;
     bool use_key_log = true;
 
+    float scaling = 1.0;
+
 } environment;
 
 environment parse_args(int argc, char *argv[])
@@ -92,7 +94,8 @@ environment parse_args(int argc, char *argv[])
                                       (option("--dist") & value("mode", env.dist_mode)) % ("distribution mode ['uniform', 'zipf']"),
                                       (option("--skew") & number("num", env.skew)) % ("skewness for zipfian [0, 1)"),
                                       (option("--cache").set(env.use_cache, true) & number("cap", env.cache_cap)) % "use block cache",
-                                      (option("--key-log-file").set(env.use_key_log, true) & value("file", env.key_log_file)) % "use keylog to record each key"));
+                                      (option("--key-log-file").set(env.use_key_log, true) & value("file", env.key_log_file)) % "use keylog to record each key",
+                                      (option("--scaling") & number("num", env.scaling)) % ("scaling for simulator")));
 
     auto minor_opt = ("minor options:" % ((option("--max_rocksdb_level") & integer("num", env.max_rocksdb_levels)) % ("limits the maximum levels rocksdb has [default: " + to_string(env.max_rocksdb_levels) + "]"),
                                           (option("--parallelism") & integer("num", env.parallelism)) % ("parallelism for writing to db [default: " + to_string(env.parallelism) + "]"),
@@ -164,6 +167,39 @@ void print_db_status(rocksdb::DB *db)
     }
 }
 
+std::vector<std::string> stats_largest_keys(rocksdb::ColumnFamilyMetaData cf_meta)
+{
+    std::vector<std::string> largest_keys;
+    int i = 0;
+    for (const auto &level : cf_meta.levels)
+    {
+        if (level.files.empty())
+            continue;
+        std::string largest_key = "0";
+        for (const auto &file : level.files)
+        {
+            if (file.largestkey > largest_key)
+            {
+                largest_key = file.largestkey;
+            }
+        }
+        largest_keys.push_back(largest_key);
+        spdlog::info("Level {} largest key: {}", i++, largest_key);
+    }
+    return largest_keys;
+}
+
+int get_estiamte_range_io(std::vector<std::string> largest_keys, string key)
+{
+    int estimate_io = 0;
+    for (const auto &largest_key : largest_keys)
+    {
+        if (key < largest_key)
+            estimate_io += 1;
+    }
+    return estimate_io;
+}
+
 int main(int argc, char *argv[])
 {
     spdlog::set_pattern("[%T.%e]%^[%l]%$ %v");
@@ -198,8 +234,11 @@ int main(int argc, char *argv[])
     rocksdb_opt.IncreaseParallelism(env.parallelism);
     rocksdb_opt.compression = rocksdb::kNoCompression;
     rocksdb_opt.bottommost_compression = kNoCompression;
-    // rocksdb_opt.use_direct_reads = true;
-    // rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
+    if (env.scaling == 1.0)
+    {
+        rocksdb_opt.use_direct_reads = true;
+        rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
+    }
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.advise_random_on_open = false;
     rocksdb_opt.random_access_max_buffer_size = 0;
@@ -210,7 +249,8 @@ int main(int argc, char *argv[])
     if (env.compaction_style == "level")
     {
         rocksdb_opt.write_buffer_size = env.B;
-        rocksdb_opt.level0_file_num_compaction_trigger = 4;
+        rocksdb_opt.target_file_size_base = 64 * 1048576 * env.scaling;
+        rocksdb_opt.level0_file_num_compaction_trigger = 1;
         rocksdb_opt.num_levels = env.max_rocksdb_levels;
         rocksdb_opt.max_bytes_for_level_multiplier = env.T;
         rocksdb_opt.max_bytes_for_level_base =
@@ -251,7 +291,7 @@ int main(int argc, char *argv[])
                 tiered_opt.size_ratio,
                 tiered_opt.levels));
     }
-    // table_options.block_size = 4 * env.E;
+    table_options.block_size = 4 * env.E;
     // table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(env.bits_per_element));
     if (env.cache_cap == 0)
         table_options.no_block_cache = true;
@@ -273,6 +313,7 @@ int main(int argc, char *argv[])
     }
 
     std::map<std::string, uint64_t> stats;
+    rocksdb::ColumnFamilyMetaData cf_meta;
     uint64_t num_running_compactions, num_pending_compactions, num_running_flushes, num_pending_flushes;
     KeyLog *key_log = new KeyLog(env.key_log_file);
     rocksdb::WriteOptions write_opt;
@@ -299,6 +340,7 @@ int main(int argc, char *argv[])
         // spdlog::info("{}", entry_num);
         key_value = data_gen->gen_kv_pair(env.E);
         db->Put(write_opt, key_value.first, key_value.second);
+        // spdlog::info("{} {}", key_value.first.size(), key_value.second.size());
     }
     spdlog::info("Waiting for all compactions to finish before running");
     rocksdb::FlushOptions flush_opt;
@@ -341,7 +383,7 @@ int main(int argc, char *argv[])
     auto write_time_end = std::chrono::high_resolution_clock::now();
     auto write_time = std::chrono::duration_cast<std::chrono::milliseconds>(write_time_end - write_time_start).count();
     spdlog::info("(init_time) : ({})", write_time);
-    rocksdb::ColumnFamilyMetaData cf_meta;
+
     db->GetColumnFamilyMetaData(&cf_meta);
 
     std::string run_per_level = "[";
@@ -359,7 +401,7 @@ int main(int argc, char *argv[])
     }
     size_per_level = size_per_level.substr(0, size_per_level.size() - 2) + "]";
     spdlog::info("size_per_level_build : {}", size_per_level);
-
+    // GetSmallestAndLargestKey(db, env.N);
     rocksdb_opt.statistics->Reset();
     rocksdb::get_iostats_context()->Reset();
     rocksdb::get_perf_context()->Reset();
@@ -370,8 +412,10 @@ int main(int argc, char *argv[])
     double cumprob[] = {p[0], p[0] + p[1], p[0] + p[1] + p[2], 1.0};
     std::string value, key, limit;
     data_gen = new YCSBGenerator(env.N, env.dist_mode, env.skew);
-    rocksdb::Iterator *it = db->NewIterator(rocksdb::ReadOptions());
+    rocksdb::ReadOptions read_opt;
     auto time_start = std::chrono::high_resolution_clock::now();
+    std::vector<std::string> largest_keys = stats_largest_keys(cf_meta);
+    int estimate_range_io = 0;
     for (size_t i = 0; i < env.steps; i++)
     {
         double r = dist(engine);
@@ -403,12 +447,20 @@ int main(int argc, char *argv[])
         case 2:
         {
             key = data_gen->gen_existing_key();
-            // key_log->log_key(key);
             limit = std::to_string(stoi(key) + 2);
-            for (it->Seek(rocksdb::Slice(key)); it->Valid() && it->key().ToString() < limit; it->Next())
+            if (env.scaling == 1.0)
             {
-                value = it->value().ToString();
+                read_opt.iterate_upper_bound = new rocksdb::Slice(limit);
+                rocksdb::Iterator *it = db->NewIterator(read_opt);
+                it->Seek(rocksdb::Slice(key));
+                while (it->Valid())
+                {
+                    value = it->value().ToString();
+                    it->Next();
+                }
+                delete it;
             }
+            estimate_range_io += get_estiamte_range_io(largest_keys, key);
             break;
         }
         case 3:
@@ -422,7 +474,7 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    delete it;
+
     // spdlog::info("Flushing DB...");
     // db->Flush(flush_opt);
     spdlog::info("Waiting for all remaining background compactions to finish");
@@ -475,6 +527,8 @@ int main(int argc, char *argv[])
     //           << "\nread_nanos " << rocksdb::get_iostats_context()->read_nanos << std::endl;
     // std::cout << rocksdb::get_iostats_context()->ToString() << std::endl;
     db->GetColumnFamilyMetaData(&cf_meta);
+    spdlog::info("(estimate_range_io) : ({})", estimate_range_io);
+    // spdlog::info("next_io:{}", next_io);
     run_per_level = "[";
     for (auto &level : cf_meta.levels)
     {

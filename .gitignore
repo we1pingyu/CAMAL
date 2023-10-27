@@ -52,3 +52,4 @@ model/
 plot/
 lrkv/optimizer/test*
 perf*
+test*
