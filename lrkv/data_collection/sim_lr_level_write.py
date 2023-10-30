@@ -8,40 +8,45 @@ import random
 import sys
 import os
 import yaml
+import ast
 from sklearn.model_selection import KFold
 
 sys.path.append('./lrkv')
 from runner import Runner
-from lsm_tree.PyRocksDB import RocksDB
+from lsm_tree.PySim import RocksDB
 from lsm_tree.cost_function import CostFunction
-from utils.model_xgb import get_cost_uniform, traverse_for_T, traverse_for_h, iter_model
+from utils.model_lr import (
+    get_level_cost,
+    get_cache_uniform,
+    traverse_for_T,
+    traverse_for_h,
+)
 from utils.distribution import dist_regression, generate_key_log
 from utils.lsm import *
-from utils.model_xgb import get_candidate_simulated_annealing, get_cost, get_cache
 
 workloads = [
-    (0.25, 0.25, 0.25, 0.25),
-    (0.97, 0.01, 0.01, 0.01),
-    (0.01, 0.97, 0.01, 0.01),
-    (0.01, 0.01, 0.97, 0.01),
-    (0.01, 0.01, 0.01, 0.97),
-    (0.49, 0.49, 0.01, 0.01),
-    (0.49, 0.01, 0.49, 0.01),
-    (0.49, 0.01, 0.01, 0.49),
-    (0.01, 0.49, 0.49, 0.01),
-    (0.01, 0.49, 0.01, 0.49),
-    (0.01, 0.01, 0.49, 0.49),
-    (0.33, 0.33, 0.33, 0.01),
-    (0.33, 0.33, 0.01, 0.33),
-    (0.33, 0.01, 0.33, 0.33),
-    (0.01, 0.33, 0.33, 0.33),
+    # (0.25, 0.25, 0.25, 0.25),
+    # (0.97, 0.01, 0.01, 0.01),
+    # (0.01, 0.97, 0.01, 0.01),
+    # (0.01, 0.01, 0.97, 0.01),
+    # (0.01, 0.01, 0.01, 0.97),
+    # (0.49, 0.49, 0.01, 0.01),
+    # (0.49, 0.01, 0.49, 0.01),
+    # (0.49, 0.01, 0.01, 0.49),
+    # (0.01, 0.49, 0.49, 0.01),
+    # (0.01, 0.49, 0.01, 0.49),
+    # (0.01, 0.01, 0.49, 0.49),
+    # (0.33, 0.33, 0.33, 0.01),
+    # (0.33, 0.33, 0.01, 0.33),
+    # (0.33, 0.01, 0.33, 0.33),
+    # (0.01, 0.33, 0.33, 0.33),
+    (0.0, 0.0, 0.0, 1.0)
 ]
 
-scaling = 10.0
-M = 2147483648 / scaling  # 256MB
+M = 2147483648  # 256MB
 n_estimators = 100
-N = 1e7 / scaling
-queries = int(200000 / scaling)
+N = 1e7
+queries = 200000
 fold = 10
 
 
@@ -49,7 +54,6 @@ class LevelCost(object):
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger('rlt_logger')
-        self.samples = 3
 
     def single_run(
         self,
@@ -64,6 +68,9 @@ class LevelCost(object):
         cache_cap,
         queries,
         key_log,
+        kv_size=8192,
+        scaling=1.0,
+        path_db='/tmp',
     ):
         z0, z1, q, w = workload
         self.logger.info(f'Workload : {z0},{z1},{q},{w}')
@@ -71,23 +78,23 @@ class LevelCost(object):
         row = self.config['lsm_tree_config'].copy()
 
         row['db_name'] = 'level_cost'
-        row['path_db'] = self.config['app']['DATABASE_PATH']
+        row['path_db'] = path_db
+        buffer = buffer
         row['T'] = size_ratio
         row['N'] = n
-        row['M'] = buffer + (bpe * n)
+        row['M'] = buffer * scaling + (bpe * n)
         row['h'] = bpe
         row['dist'] = dist
         row['skew'] = skew
-        row['cache_cap'] = cache_cap
+        row['cache_cap'] = cache_cap * scaling
         row['is_leveling_policy'] = True
         row['queries'] = queries
-        row['mbuf'] = buffer / 8
+        row['mbuf'] = buffer * scaling
         row['z0'] = z0
         row['z1'] = z1
         row['q'] = q
         row['w'] = w
         db = RocksDB(self.config)
-
         self.logger.info('Running workload')
         row['key_log'] = key_log
         results = db.run(
@@ -96,7 +103,7 @@ class LevelCost(object):
             row['h'],
             row['T'],
             row['N'],
-            row['E'],
+            kv_size,
             row['M'],
             z0,
             z1,
@@ -108,6 +115,7 @@ class LevelCost(object):
             is_leveling_policy=row['is_leveling_policy'],
             cache_cap=cache_cap,
             key_log=key_log,
+            scaling=scaling,
         )
 
         for key, val in results.items():
@@ -180,34 +188,19 @@ class LevelCost(object):
         if not os.path.exists(key_path):
             os.makedirs(key_path)
         step = 0
-        for workload in workloads:
-            z0, z1, q, w = workload
-            # Train and search optimal size ratio
-            min_err = 1e9
-            for T in range(2, estimate_T(N, M / 2 / 8, 1) + 1):
-                err = T_level_equation(T, q, w)
-                if err < min_err:
-                    min_err = err
-                    temp = T
-            if len(df) == 0:
-                T_list = self.sample_around_x0(
-                    temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1) + 1
-                )
-            else:
-                regr = iter_model(df, 'level')
-                t = traverse_for_T([regr], z0, z1, q, w, n=-1)
-                T_list = [temp]
-                T_list = weight_sampling(t, 0, self.samples, T_list)
-            print(T_list)
-            z0, z1, q, w = workload
-            ratio = 1.0
-            dist = 'uniform'
-            skew = 0.0
-            bpe = 10
-            buffer = ratio * (M - bpe * N)
-            cache_cap = (1 - ratio) * M / 8
-            for size_ratio in T_list:
+
+        for step in range(100):
+            for workload in workloads:
+                # z0, z1, q, w = workload
+                size_ratio = random.choice([2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16, 32, 64])
+                ratio = random.uniform(0.5, 1)
+                dist = 'uniform'
+                skew = 0.0
+                bpe = 10
+                buffer = ratio * (M - bpe * N)
+                cache_cap = 0.0
                 key_log = key_path + '/{}.dat'.format(step)
+                # original
                 row = self.single_run(
                     workload,
                     size_ratio,
@@ -223,82 +216,36 @@ class LevelCost(object):
                 )
                 # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_ckpt'])
-                step += 1
+                pd.DataFrame(df).to_csv(
+                    "raw_data/samples_sim_lr_level_uniform_write_ckpt.csv"
+                )
 
-            # iter model
-            regr = iter_model(df, 'level')
-            candidates = traverse_for_T([regr], z0, z1, q, w, n=1)
-            T0 = int((candidates[0][0] + T_list[0]) / 2)
-            T0 = candidates[0][0]
-
-            min_err = 1e9
-            for h in range(2, 15):
-                err = h_mbuf_level_equation(h, z0, z1, q, w, T0, N, M)
-                if err < min_err:
-                    min_err = err
-                    temp = h
-            h_list = []
-            if False:
-                h_list = self.sample_around_x0(temp, self.samples, 2, 15)
-            else:
-                regr = iter_model(df, 'level')
-                h = traverse_for_h([regr], z0, z1, q, w, T0=T0, n=-1)
-                h_list = [temp]
-                h_list = weight_sampling(h, 1, self.samples, h_list)
-            print(h_list)
-            for h in h_list:
-                buffer = ratio * (M - h * N)
-                size_ratio = T0
-                key_log = key_path + '/{}.dat'.format(step)
+                # scaling
                 row = self.single_run(
                     workload,
                     size_ratio,
                     ratio,
                     N,
                     buffer,
-                    h,
+                    bpe,
                     dist,
                     skew,
                     cache_cap,
                     queries,
                     key_log,
+                    kv_size=8 * 8,
+                    scaling=32 / 1052,
+                    path_db='/dev/shm',
                 )
+                # print(row)
                 df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_ckpt'])
-                step += 1
-            # iter model
-            regr = iter_model(df, 'level')
-            candidates = traverse_for_h([regr], z0, z1, q, w, T0=T0, n=1)
-            h0 = int((candidates[0][1] + h_list[0]) / 2)
-            h0 = candidates[0][1]
-
-            min_err = 1e9
-            for ratio in [0.7, 0.8, 0.9]:
-                buffer = ratio * (M - h0 * N)
-                cache_cap = (1 - ratio) * M / 8
-                size_ratio = T0
-                key_log = key_path + '/{}.dat'.format(step)
-                row = self.single_run(
-                    workload,
-                    size_ratio,
-                    ratio,
-                    N,
-                    buffer,
-                    h0,
-                    dist,
-                    skew,
-                    cache_cap,
-                    queries,
-                    key_log,
+                pd.DataFrame(df).to_csv(
+                    "raw_data/samples_sim_lr_level_uniform_write_ckpt.csv"
                 )
-                df.append(row)
-                pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_ckpt'])
-                step += 1
 
-        self.logger.info('Exporting data from xgb level')
-        pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_level_final'])
-        self.logger.info(f'Finished xgb level, use {time.time()-start_time}s\n')
+        self.logger.info('Exporting data from active learning level cost')
+        pd.DataFrame(df).to_csv("raw_data/samples_sim_lr_level_uniform_write_final.csv")
+        self.logger.info(f'Finished al_level_cost, use {time.time()-start_time}s\n')
 
 
 if __name__ == "__main__":

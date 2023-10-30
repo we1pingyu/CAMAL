@@ -19,12 +19,13 @@ from utils.distribution import dist_regression
 
 np.set_printoptions(suppress=True)
 
-N = 1e7 / 10
+scaling = 10.0
+N = 1e7 / scaling
 E = 1024
-Q = int(200000 / 10)
+Q = int(200000 / scaling)
 B = 4
 S = 2
-M = 2147483648 / 10  # 256MB
+M = 2147483648 / scaling  # 256MB
 workloads = [
     (0.25, 0.25, 0.25, 0.25),
     (0.97, 0.01, 0.01, 0.01),
@@ -351,10 +352,10 @@ class Optimizer(object):
                 policy='tier',
             )
             print(
-                f'level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio},best_var: {best_var}, best_cost:{best_cost}'
+                f'level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio},best_var: {best_var}, best_cost:{best_cost*Q}'
             )
             print(
-                f'tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost}'
+                f'tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}'
             )
             if tier_best_cost < best_cost:
                 row['is_leveling_policy'] = False
@@ -366,7 +367,7 @@ class Optimizer(object):
                 )
             policy = row['is_leveling_policy']
             print(
-                f'lr_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost}'
+                f'lr_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost*Q}'
             )
             row['T'] = int(best_T)
             row['h'] = best_h * best_ratio
@@ -423,7 +424,7 @@ class Optimizer(object):
                 best_T,
                 best_h,
                 best_ratio,
-                _,
+                best_var,
                 best_cost,
             ) = model_xgb.traverse_var_optimizer_uniform(
                 level_cost_models, 1, z0, z1, q, w
@@ -433,16 +434,16 @@ class Optimizer(object):
                 tier_best_T,
                 tier_best_h,
                 tier_best_ratio,
-                _,
+                tier_best_var,
                 tier_best_cost,
             ) = model_xgb.traverse_var_optimizer_uniform(
                 tier_cost_models, 0, z0, z1, q, w
             )
             print(
-                f'level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, best_cost:{best_cost}'
+                f'level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, best_var: {best_var}, best_cost:{best_cost*Q}'
             )
             print(
-                f'tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_cost:{tier_best_cost}'
+                f'tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}'
             )
             if tier_best_cost < best_cost:
                 row['is_leveling_policy'] = False
@@ -454,7 +455,7 @@ class Optimizer(object):
                 )
             policy = row['is_leveling_policy']
             print(
-                f'xgb_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost}'
+                f'xgb_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost*Q}'
             )
             row['T'] = int(best_T)
             row['h'] = best_h * best_ratio

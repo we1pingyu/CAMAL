@@ -85,7 +85,7 @@ CompactionTask *TieredCompactor::PickCompaction(rocksdb::DB *db, const std::stri
 
     if (level_idx == 0)
     {
-        if (input_file_names.size() >= 4)
+        if (input_file_names.size() >= 2)
         {
 
             // pick targer output level

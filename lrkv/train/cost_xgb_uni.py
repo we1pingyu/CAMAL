@@ -16,17 +16,22 @@ from sklearn.model_selection import KFold
 
 np.set_printoptions(suppress=True)
 
-E = 1024
-Q = 20000
+scaling = 10
+E = 1000
+Q = int(200000 / scaling)
 B = 4
 S = 2
-M = 214748364.8  # 256MB
+M = 2147483648 / scaling  # 256MB
 
-for num_sample in [20]:
+level_data = 'raw_data/samples_sim_xgb_level_uniform_final.csv'
+tier_data = 'raw_data/samples_sim_xgb_tier_uniform_final.csv'
+fold = 15
+
+for num_sample in [100]:
     start_time = time.time()
     print('Start level training')
-    all_samples = pd.read_csv('raw_data/samples_sim_xgb_level_uniform_final.csv')
-    timestamp = os.path.getctime('raw_data/samples_sim_xgb_level_uniform_final.csv')
+    all_samples = pd.read_csv(level_data)
+    timestamp = os.path.getctime(level_data)
     creation_time = datetime.fromtimestamp(timestamp)
     print(creation_time)
     all_samples = all_samples.sample(frac=1)
@@ -39,7 +44,8 @@ for num_sample in [20]:
             continue
         # if 'ratio' not in sample:
         #     sample['ratio'] = sample['mbuf'] * 8 / (M - sample['h'] * sample['N'])
-        sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
+        # sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
+        # print(sample['ratio'])
         X.append(
             get_cost_uniform(
                 sample['T'],
@@ -57,7 +63,6 @@ for num_sample in [20]:
         Y.append(y)
 
     eps = 1e-8
-    fold = 4
     regrs = []
     X = np.array(X)
     Y = np.array(Y)
@@ -69,8 +74,7 @@ for num_sample in [20]:
         X_train = X[train_index]
         Y_train = Y[train_index]
         weights = 1 / Y_train
-        regr = xgb.XGBRegressor()
-
+        regr = xgb.XGBRegressor(learning_rate=1)
         # Train the XGBoost cache model
         regr.fit(X_train, Y_train)
         X_test = X[test_index]
@@ -86,8 +90,8 @@ for num_sample in [20]:
     pickle.dump(regrs, open(f'model/level_cost_xgb_uni_sim.pkl', "wb"))
     print(time.time() - start_time)
 
-    all_samples = pd.read_csv('raw_data/samples_sim_xgb_tier_uniform_final.csv')
-    timestamp = os.path.getctime('raw_data/samples_sim_xgb_tier_uniform_final.csv')    
+    all_samples = pd.read_csv(tier_data)
+    timestamp = os.path.getctime(tier_data)
     creation_time = datetime.fromtimestamp(timestamp)
     print(creation_time)
     all_samples = all_samples.sample(frac=1)
@@ -97,7 +101,9 @@ for num_sample in [20]:
     for _, sample in all_samples.iterrows():
         if sample['read_io'] + sample['write_io'] == 0:
             continue
-        sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
+        # if 'ratio' not in sample:
+        #     sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
+        # print(sample['ratio'])
         X.append(
             get_cost_uniform(
                 sample['T'],
@@ -127,7 +133,7 @@ for num_sample in [20]:
         X_train = X[train_index]
         Y_train = Y[train_index]
         weights = 1 / Y_train
-        regr = xgb.XGBRegressor()
+        regr = xgb.XGBRegressor(learning_rate=1)
 
         # Train the XGBoost cache model
         regr.fit(X_train, Y_train)

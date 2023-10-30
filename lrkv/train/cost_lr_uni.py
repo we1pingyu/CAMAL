@@ -13,16 +13,21 @@ from sklearn.linear_model import LinearRegression
 
 np.set_printoptions(suppress=True)
 
-E = 1024
-Q = 20000
+scaling = 10
+E = 1000
+Q = int(200000 / scaling)
 B = 4
 S = 2
-M = 214748364.8  # 256MB
+M = 2147483648 / scaling  # 256MB
+fold = 15
 
-for num_sample in [8]:
+level_data = 'raw_data/samples_sim_xgb_level_uniform_final.csv'
+tier_data = 'raw_data/samples_sim_xgb_tier_uniform_final.csv'
+
+for num_sample in [100]:
     start_time = time.time()
-    all_samples = pd.read_csv('raw_data/samples_safe_level_uniform_ckpt.csv')
-    all_samples = all_samples.sample(frac=1)
+    all_samples = pd.read_csv(level_data)
+    # all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
     Xc = []
     Yc = []
@@ -30,13 +35,13 @@ for num_sample in [8]:
     Y = []
 
     eps = 1e-8
-    fold = 4
     print('Start training')
     for _, sample in all_samples.iterrows():
         if sample['read_io'] + sample['write_io'] == 0:
             continue
+        # print(1 - sample['cache_cap'] * 8 / M)
         # if 'ratio' not in sample:
-        sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
+        #     sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
         xc = get_cache_uniform(
             sample['T'],
             sample['h'],
@@ -59,7 +64,7 @@ for num_sample in [8]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
-                sample['cache_hit_rate'],
+                sample['cache_hit_rate'] + eps,
                 M,
                 sample['N'],
             )
@@ -114,7 +119,7 @@ for num_sample in [8]:
     pkl.dump(Ws, open(f'model/level_lr_sim_cost_model.pkl', "wb"))
     print(time.time() - start_time)
 
-    all_samples = pd.read_csv('raw_data/samples_safe_tiering_uniform_ckpt.csv')
+    all_samples = pd.read_csv(tier_data)
     all_samples = all_samples.sample(frac=1)
     all_samples = all_samples[: num_sample * 15]
 
@@ -124,13 +129,12 @@ for num_sample in [8]:
     Y = []
 
     eps = 1e-8
-    fold = 4
     print('Start training')
     for _, sample in all_samples.iterrows():
         if sample['read_io'] + sample['write_io'] == 0:
             continue
         # if 'ratio' not in sample:
-        sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
+        #     sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
         xc = get_cache_uniform(
             sample['T'],
             sample['h'],
@@ -153,7 +157,7 @@ for num_sample in [8]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
-                sample['cache_hit_rate'],
+                sample['cache_hit_rate'] + eps,
                 M,
                 sample['N'],
             )

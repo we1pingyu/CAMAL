@@ -10,9 +10,7 @@ from scipy import optimize
 # from sympy import *
 
 # from lsm_tree.cost_function import NominalCostFunction
-
-M = 214748364.8
-
+B = 4
 
 def weight_sampling(l, o, n, r):
     a = []
@@ -51,9 +49,9 @@ def estimate_fpr(h):
     return np.exp(-1 * h * (np.log(2) ** 2))
 
 
-def f_level_T(q, w, T, h0=10, N=1e6, E=1024):
+def f_level_T(q, w, T, h0=10, E=1024, N=1e7 / 5, M=2147483648 / 5):
     buffer_range = (M - 1e6 * h0) / 8 * 0.5
-    return (q / np.log(T) + w / 4 * T / np.log(T)) * np.log(N * E) * buffer_range
+    return (q / np.log(T) + w / B * T / np.log(T)) * np.log(N * E) * buffer_range
 
 
 def delat_level_T(q, w, T, s, B=4):
@@ -61,7 +59,7 @@ def delat_level_T(q, w, T, s, B=4):
     return abs(s / ((2 * w * T * np.log(T + 1) - q * B) / (T * np.log(T) * np.log(T))))
 
 
-def find_level_T(q, w, n, h0=10, N=1e6):
+def find_level_T(q, w, n, h0=10, N=1e6, M=2147483648 / 5):
     buffer0 = (M - 1e6 * h0) / 8
     Tlim = int(N * 1024 / buffer0) + 1
     splits = np.linspace(f_level_T(q, w, Tlim), f_level_T(q, w, 2), n)
@@ -83,10 +81,10 @@ def find_level_T(q, w, n, h0=10, N=1e6):
     return set(results)
 
 
-def f_tier_T(z0, z1, q, w, T, h0=10, N=1e6):
+def f_tier_T(z0, z1, q, w, T, h0=10, N=1e7 / 5, M=2147483648 / 5):
     buffer_range = (M - 1e6 * h0) / 8 * 0.5
     fpr = estimate_fpr(h0)
-    return z0 * fpr * T + z1 * (fpr * T + 1) + q * l * T + w / 4 * l
+    return z0 * fpr * T + z1 * (fpr * T + 1) + q * l * T + w / B * l
 
 
 def find_tier_T(z0, z1, q, w, n, h0=10, N=1e6):
@@ -184,7 +182,7 @@ def level_gradient(z0, z1, q, w, T, h, ratio, N=1e6, E=1024, M=214748364.8):
     mbuf = ratio * (M - N * h) / 8
     l = estimate_level(N, mbuf, T)
     fpr = estimate_fpr(h)
-    delta_T = w * l / 4 - (q + w * T / 4) * np.log(N * E / mbuf) / T / np.log(
+    delta_T = w * l / B - (q + w * T / 4) * np.log(N * E / mbuf) / T / np.log(
         T
     ) / np.log(T)
     delta_h = -(z0 + z1) * fpr
@@ -282,7 +280,7 @@ def level_grid_sampling(workload, n=16, N=1e6, B=4, E=1024):
 
 
 def T_level_equation(x, q, w):
-    return abs(w * x * (np.log(x) - 1) - q * 4 - w)
+    return abs(w * x * (np.log(x) - 1) - q * B - w)
 
 
 def filt_memory_level_equation(h, oh, l, M=214748364.8, N=1e6):
@@ -290,7 +288,7 @@ def filt_memory_level_equation(h, oh, l, M=214748364.8, N=1e6):
     return abs((l * M - h * N) / np.exp(h) - (M - oh * N) / np.exp(oh))
 
 
-def h_mbuf_level_equation(x, z0, z1, w, q, T, N=1e6):
+def h_mbuf_level_equation(x, z0, z1, w, q, T, N=1e6, M=2147483648 / 5):
     return abs(
         ((z0 + z1) * np.exp(-x / N)) / N - ((q + w * (T + 1) / 4) / np.log(T) / (M - x))
     )
@@ -322,50 +320,29 @@ def h_T_tier_equation(w, mfilt, T, N=1e6, B=4, E=1024):
     return a, b
 
 
-def h_mbuf_tier_equation(x, z0, z1, w, q, T, N=1e6):
+def h_mbuf_tier_equation(x, z0, z1, w, q, T, N=1e6, M=2147483648 / 5):
     return abs(
         ((z0 + z1) * T / N * np.exp(-x / N))
-        - (((q + w) * T + w / 4) / np.log(T) / (M - x))
+        - (((q + w) * T + w / B) / np.log(T) / (M - x))
     )
 
 
-# def T_tier_equation(x, z0, z1, q, w, h, N=1e6, mbuf=M / 8, E=1024):
-#     p0 = estimate_fpr(1)
-#     p1 = estimate_fpr(16)
-#     m0 = M / 8 / 2
-#     m1 = M / 8
-#     return abs(
-#         (z0 + z1) * 0.5 * (p1 - p0)
-#         + q * 0.5
-#         + (np.log(N * E) - (m1 * (np.log(m1) - 1) - m0 * (np.log(m0) - 1)) / (m1 - m0))
-#         / (4 * np.log(x) * np.log(x))
-#         * (q * 4 * log(x) - q * 4 - w)
-#     )
 
 
-def T_tier_equation(x, z0, z1, q, w, h=20, N=1e6, E=1024):
+
+def T_tier_equation(x, z0, z1, q, w, h=20, N=1e6, M=214748364.8):
     # p0 = estimate_fpr(1)
     # p1 = estimate_fpr(10)
     # m0 = M / 8 / 2
     # m1 = M / 8
     # p = estimate_fpr(16)
-    M = 214748364.8
     mbuf = (M - N * h) / 8
     l = estimate_level(N, mbuf, x)
     return abs(
         (z0 + z1) * estimate_fpr(h)
         + q * 0.5
-        + l * (q * 4 * x * (np.log(x) - 1) - w) / (4 * x * np.log(x))
+        + l * (q * B * x * (np.log(x) - 1) - w) / (B * x * np.log(x))
     )
-    # print((z0 + z1) * 0.5 * (p0 - p1), q * 0.5)
-    # return abs(
-    #     (z0 + z1) * 0.5 * (p0 - p1)
-    #     + q * 0.5
-    #     + q * l
-    #     - (q * x + w / 4) * (np.log(N * E / mbuf) / (x * np.log(x) * np.log(x)))
-    # )
-    # print(x, q * 4 * x * (np.log(x) - 1) - w)
-    return abs(q * 4 * x * (np.log(x) - 1) - w)
 
 
 def level_min_cost_sampling(workload, n=10, N=1e6, B=4, E=1024):

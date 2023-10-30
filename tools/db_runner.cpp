@@ -206,13 +206,14 @@ int main(int argc, char *argv[])
     rocksdb_opt.advise_random_on_open = false;
     rocksdb_opt.random_access_max_buffer_size = 0;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
+    rocksdb_opt.target_file_size_base = uint64_t(6.4 * 1048576);
     tmpdb::TieredCompactor *tiered_compactor = nullptr;
     tmpdb::TieredOptions tiered_opt;
 
     if (env.compaction_style == "level")
     {
         rocksdb_opt.write_buffer_size = env.B;
-        rocksdb_opt.level0_file_num_compaction_trigger = 4;
+        rocksdb_opt.level0_file_num_compaction_trigger = 2;
         rocksdb_opt.num_levels = env.max_rocksdb_levels;
         rocksdb_opt.max_bytes_for_level_multiplier = env.T;
         rocksdb_opt.max_bytes_for_level_base =
@@ -237,6 +238,7 @@ int main(int argc, char *argv[])
         rocksdb_opt.listeners.emplace_back(tiered_compactor);
     }
     rocksdb::BlockBasedTableOptions table_options;
+    table_options.block_size = 4096;
     if (env.compaction_style == "level")
     {
         table_options.filter_policy.reset(
@@ -303,7 +305,7 @@ int main(int argc, char *argv[])
     }
     spdlog::info("Waiting for all compactions to finish before running");
     rocksdb::FlushOptions flush_opt;
-    // db->Flush(flush_opt);
+    db->Flush(flush_opt);
     if (env.compaction_style == "level")
     {
         while (true)
@@ -424,7 +426,7 @@ int main(int argc, char *argv[])
     }
     delete it;
     // spdlog::info("Flushing DB...");
-    // db->Flush(flush_opt);
+    db->Flush(flush_opt);
     spdlog::info("Waiting for all remaining background compactions to finish");
     if (env.compaction_style == "level")
     {

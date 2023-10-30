@@ -16,7 +16,7 @@ lsm_tree_config:
     phi: 1
     s: 0.0000002        # Average range query selectivity
     B: 4            # Number of entries that fit in a disk page
-    E: 8192         # Size of data entries in bits
+    E: 8000         # Size of data entries in bits
     M: 8589934592   # Total memory budget of 1 GiB
     is_leveling_policy: False  # Leveling or Tiering policy
 

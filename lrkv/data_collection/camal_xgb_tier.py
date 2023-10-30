@@ -14,7 +14,7 @@ sys.path.append('./lrkv')
 from runner import Runner
 from lsm_tree.PyRocksDB import RocksDB
 from lsm_tree.cost_function import CostFunction
-from utils.model_xgb import get_cost_uniform, traverse_for_T, traverse_for_h
+from utils.model_xgb import get_cost_uniform, traverse_for_T, traverse_for_h, iter_model
 from utils.distribution import dist_regression, generate_key_log
 from utils.lsm import *
 from utils.model_xgb import get_candidate_simulated_annealing, get_cost, get_cache
@@ -37,10 +37,11 @@ workloads = [
     (0.01, 0.33, 0.33, 0.33),
 ]
 
-M = 214748364.8  # 256MB
+scaling = 10.0
+M = 2147483648 / scaling  # 256MB
 n_estimators = 100
-N = 1e6
-queries = 20000
+N = 1e7 / scaling
+queries = int(200000 / scaling)
 fold = 10
 
 
@@ -179,15 +180,12 @@ class LevelCost(object):
         if not os.path.exists(key_path):
             os.makedirs(key_path)
         step = 0
-        num_samples = 3
-        X = []
-        Y = []
         for workload in workloads:
             z0, z1, q, w = workload
             # Train and search optimal size ratio
             min_err = 1e9
             for T in range(2, estimate_T(N, M / 2 / 8, 1) + 1):
-                err = T_tier_equation(T, z0, z1, q, w, N=N)
+                err = T_tier_equation(T, z0, z1, q, w, N=N, M=M)
                 if err < min_err:
                     min_err = err
                     temp = T
@@ -196,23 +194,7 @@ class LevelCost(object):
                     temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1) + 1
                 )
             else:
-                for sample in df:
-                    X.append(
-                        get_cost_uniform(
-                            sample['T'],
-                            sample['h'],
-                            sample['ratio'],
-                            sample['z0'],
-                            sample['z1'],
-                            sample['q'],
-                            sample['w'],
-                        )
-                    )
-                    Y.append(sample['total_latency'] / sample['queries'])
-                _X = np.array(X)
-                _Y = np.array(Y)
-                regr = xgb.XGBRegressor()
-                regr.fit(_X, _Y)
+                regr = iter_model(df, 'tier')
                 t = traverse_for_T([regr], z0, z1, q, w, n=-1)
                 T_list = [temp]
                 T_list = weight_sampling(t, 0, self.samples, T_list)
@@ -223,7 +205,7 @@ class LevelCost(object):
             skew = 0.0
             bpe = 10
             buffer = ratio * (M - bpe * N)
-            cache_cap = (1 - ratio) * (M - bpe * N) / 8
+            cache_cap = (1 - ratio) * M / 8
             for size_ratio in T_list:
                 key_log = key_path + '/{}.dat'.format(step)
                 row = self.single_run(
@@ -245,31 +227,14 @@ class LevelCost(object):
                 step += 1
 
             # iter model
-            X = []
-            Y = []
-            for sample in df:
-                X.append(
-                    get_cost_uniform(
-                        sample['T'],
-                        sample['h'],
-                        sample['ratio'],
-                        sample['z0'],
-                        sample['z1'],
-                        sample['q'],
-                        sample['w'],
-                    )
-                )
-                Y.append(sample['total_latency'] / sample['queries'])
-            _X = np.array(X)
-            _Y = np.array(Y)
-            regr = xgb.XGBRegressor()
-            regr.fit(_X, _Y)
+            regr = iter_model(df, 'tier')
             candidates = traverse_for_T([regr], z0, z1, q, w, n=1)
             T0 = int((candidates[0][0] + T_list[0]) / 2)
+            T0 = candidates[0][0]
 
             min_err = 1e9
-            for h in range(1, 17):
-                err = h_mbuf_level_equation(h, z0, z1, q, w, T0, N)
+            for h in range(2, 15):
+                err = h_mbuf_level_equation(h, z0, z1, q, w, T0, N, M)
                 if err < min_err:
                     min_err = err
                     temp = h
@@ -277,25 +242,7 @@ class LevelCost(object):
             if False:
                 h_list = self.sample_around_x0(temp, self.samples, 2, 15)
             else:
-                X = []
-                Y = []
-                for sample in df:
-                    X.append(
-                        get_cost_uniform(
-                            sample['T'],
-                            sample['h'],
-                            sample['ratio'],
-                            sample['z0'],
-                            sample['z1'],
-                            sample['q'],
-                            sample['w'],
-                        )
-                    )
-                    Y.append(sample['total_latency'] / sample['queries'])
-                _X = np.array(X)
-                _Y = np.array(Y)
-                regr = xgb.XGBRegressor()
-                regr.fit(_X, _Y)
+                regr = iter_model(df, 'tier')
                 h = traverse_for_h([regr], z0, z1, q, w, T0=T0, n=-1)
                 h_list = [temp]
                 h_list = weight_sampling(h, 1, self.samples, h_list)
@@ -322,32 +269,15 @@ class LevelCost(object):
                 pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
             # iter model
-            X = []
-            Y = []
-            for sample in df:
-                X.append(
-                    get_cost_uniform(
-                        sample['T'],
-                        sample['h'],
-                        sample['ratio'],
-                        sample['z0'],
-                        sample['z1'],
-                        sample['q'],
-                        sample['w'],
-                    )
-                )
-                Y.append(sample['total_latency'] / sample['queries'])
-            _X = np.array(X)
-            _Y = np.array(Y)
-            regr = xgb.XGBRegressor()
-            regr.fit(_X, _Y)
+            regr = iter_model(df, 'tier')
             candidates = traverse_for_h([regr], z0, z1, q, w, T0=T0, n=1)
             h0 = int((candidates[0][1] + h_list[0]) / 2)
+            h0 = candidates[0][1]
 
             min_err = 1e9
             for ratio in [0.7, 0.8, 0.9]:
                 buffer = ratio * (M - h0 * N)
-                cache_cap = (1 - ratio) * (M - h0 * N) / 8
+                cache_cap = (1 - ratio) * M / 8
                 size_ratio = T0
                 key_log = key_path + '/{}.dat'.format(step)
                 row = self.single_run(
@@ -368,9 +298,9 @@ class LevelCost(object):
                 pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1
 
-        self.logger.info('Exporting data from active learning level cost')
+        self.logger.info('Exporting data from xgb tier')
         pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_final'])
-        self.logger.info(f'Finished al_tier_cost, use {time.time()-start_time}s\n')
+        self.logger.info(f'Finished xgb tier, use {time.time()-start_time}s\n')
 
 
 if __name__ == "__main__":

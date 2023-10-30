@@ -12,6 +12,29 @@ from utils.lsm import estimate_level, estimate_fpr
 eps = 1e-5
 
 
+def iter_model(df, policy='level'):
+    X = []
+    Y = []
+    for sample in df:
+        X.append(
+            get_cost_uniform(
+                sample['T'],
+                sample['h'],
+                sample['ratio'],
+                sample['z0'],
+                sample['z1'],
+                sample['q'],
+                sample['w'],
+            )
+        )
+        Y.append(sample['total_latency'] / sample['queries'])
+    _X = np.array(X)
+    _Y = np.array(Y)
+    regr = xgb.XGBRegressor()
+    regr.fit(_X, _Y)
+    return regr
+
+
 def prepare_df(samples, save_path):
     df = []
     for _, sample in samples.iterrows():
@@ -66,7 +89,7 @@ def load_models(model_path, folds=10):
 
 
 def get_cache(
-    current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, M=.2147483648, N=1e6
+    current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, M=0.2147483648, N=1e6
 ):
     fpr = estimate_fpr(current_h)
     buffer = current_ratio * (M - current_h * N)
@@ -112,7 +135,7 @@ def get_cost(
 ):
     fpr = estimate_fpr(current_h)
     buffer = current_ratio * (M - current_h * N)
-    cache_cap = (1 - current_ratio) * (M - current_h * N) / 8
+    cache_cap = (1 - current_ratio) * M / 8
     l = estimate_level(N, buffer, current_T)
     return [alpha, c, z0, z1, q, w, current_T, l, fpr, cache_cap, buffer, y_cache]
 
@@ -123,8 +146,8 @@ def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e6):
     xs = []
     settings = []
     for T in range(2, 78):
-        for h in range(1, 16):
-            for ratio in [0.8, 0.85, 0.9, 0.95, 1.0]:
+        for h in range(2, 15):
+            for ratio in [0.7, 0.8, 0.9, 1.0]:
                 x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
                 settings.append((T, h, ratio, None))
                 xs.append(x)
@@ -133,11 +156,18 @@ def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e6):
         cost = cost_model.predict(X)
         costs.append(cost)
     costs = np.array(costs)
+    vars = np.var(costs, axis=0)
     costs = np.mean(costs, axis=0)
-    candidates = sorted(zip(costs, settings), key=lambda x: x[0])
+    candidates = sorted(zip(costs, vars, settings), key=lambda x: x[0])
     candidate = candidates[0]
     print(time.time() - start_time)
-    return candidate[1][0], candidate[1][1], candidate[1][2], None, candidate[0]
+    return (
+        candidate[-1][0],
+        candidate[-1][1],
+        candidate[-1][2],
+        candidate[1],
+        candidate[0],
+    )
 
 
 def traverse_var_optimizer_uniform_T(
@@ -173,7 +203,7 @@ def traverse_var_optimizer_uniform_memory(
     xs = []
     settings = []
     for T in range(2, 78):
-        for h in range(1, 16):
+        for h in range(2, 15):
             ratio = 1
             x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
             settings.append((T, h, ratio, None))
@@ -210,7 +240,7 @@ def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e6, n=10):
 
 def traverse_for_h(cost_models, z0, z1, q, w, T0=10, ratio0=1.0, N=1e6, n=10):
     candidates = []
-    for h in range(1, 16):
+    for h in range(2, 15):
         T = T0
         ratio = ratio0
         costs = []

@@ -13,6 +13,59 @@ from utils.lsm import estimate_level, estimate_fpr
 eps = 1e-5
 
 
+def iter_model(df, policy='level'):
+    X = []
+    Y = []
+    Xc = []
+    Yc = []
+    for sample in df:
+        xc = get_cache_uniform(
+            sample['T'],
+            sample['h'],
+            sample['ratio'],
+            sample['z0'],
+            sample['z1'],
+            sample['q'],
+            sample['w'],
+        )
+        Xc.append(xc)
+        Yc.append(np.log(sample['cache_hit_rate'] + eps))
+        if policy == 'level':
+            X.append(
+                get_level_cost(
+                    sample['T'],
+                    sample['h'],
+                    sample['ratio'],
+                    sample['z0'],
+                    sample['z1'],
+                    sample['q'],
+                    sample['w'],
+                    sample['cache_hit_rate'],
+                )
+            )
+        else:
+            X.append(
+                get_tier_cost(
+                    sample['T'],
+                    sample['h'],
+                    sample['ratio'],
+                    sample['z0'],
+                    sample['z1'],
+                    sample['q'],
+                    sample['w'],
+                    sample['cache_hit_rate'],
+                )
+            )
+        Y.append(sample['total_latency'] / sample['queries'])
+    _Xc = np.array(Xc)
+    _Yc = np.array(Yc)
+    Wc = np.linalg.lstsq(_Xc, _Yc, rcond=-1)[0]
+    _X = np.array(X)
+    _Y = np.array(Y)
+    W = np.linalg.lstsq(_X, _Y, rcond=-1)[0]
+    return Wc, W
+
+
 def traverse_for_T(
     Ws, Wcs, z0, z1, q, w, h0=10, ratio0=1.0, N=1e6, n=10, policy='level'
 ):
@@ -101,6 +154,8 @@ def get_cache_uniform(
     h = current_ratio * current_h
     fpr = estimate_fpr(h)
     cache_cap = (1 - current_ratio) * M / 8
+    # print('buffer:', current_ratio, M, current_h)
+    # print('cache:', N, buffer, current_T)
     l = estimate_level(N, buffer, current_T)
     xc = [1]
     for power in (z0, z1, q, w, 1):
@@ -312,8 +367,8 @@ def traverse_var_optimizer_uniform(
     start_time = time.time()
     candidates = []
     for T in range(2, 78):
-        for h in range(1, 16):
-            for ratio in [0.8, 0.85, 0.9, 0.95, 1.0]:
+        for h in range(2, 15):
+            for ratio in [0.7, 0.8, 0.9, 1.0]:
                 costs = []
                 for Wc, W in zip(Wcs, Ws):
                     xc = get_cache_uniform(T, h, ratio, z0, z1, q, w, N=N, M=M)
@@ -325,8 +380,8 @@ def traverse_var_optimizer_uniform(
                     costs.append(max(np.dot(x, W), eps))
                 candidates.append([T, h, ratio, np.var(costs), np.mean(costs)])
     candidates.sort(key=lambda x: x[-1])
-    candidates = candidates[:10]
-    candidates.sort(key=lambda x: x[-2])
+    # candidates = candidates[:10]
+    # candidates.sort(key=lambda x: x[-2])
     print(time.time() - start_time)
     return candidates[0]
 
