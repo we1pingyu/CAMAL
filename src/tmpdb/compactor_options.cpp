@@ -1,14 +1,14 @@
-#include "tmpdb/tiered_options.hpp"
+#include "tmpdb/compactor_options.hpp"
 
 using namespace tmpdb;
 using json = nlohmann::json;
 
-TieredOptions::TieredOptions(std::string config_path)
+CompactorOptions::CompactorOptions(std::string config_path)
 {
     this->read_config(config_path);
 }
 
-bool TieredOptions::read_config(std::string config_path)
+bool CompactorOptions::read_config(std::string config_path)
 {
     json cfg;
     std::ifstream read_cfg(config_path);
@@ -35,7 +35,7 @@ bool TieredOptions::read_config(std::string config_path)
     return true;
 }
 
-bool TieredOptions::write_config(std::string config_path)
+bool CompactorOptions::write_config(std::string config_path)
 {
     json cfg;
     cfg["size_ratio"] = this->size_ratio;

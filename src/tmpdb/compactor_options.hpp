@@ -1,5 +1,5 @@
-#ifndef TIERED_OPTIONS_H_
-#define TIERED_OPTIONS_H_
+#ifndef OPTIONS_H_
+#define OPTIONS_H_
 
 #include <iostream>
 #include <fstream>
@@ -26,9 +26,10 @@ namespace tmpdb
         BUFFER = 2
     } file_size_policy;
 
-    class TieredOptions
+    class CompactorOptions
     {
     public:
+        bool tiered_policy = true;
         int size_ratio = 2;            //> (T)
         int lower_level_run_max = 1;   //> (K)
         int largest_level_run_max = 1; //> (Z)
@@ -45,9 +46,9 @@ namespace tmpdb
 
         size_t file_size = std::numeric_limits<size_t>::max();
 
-        TieredOptions(){};
+        CompactorOptions(){};
 
-        TieredOptions(std::string config_path);
+        CompactorOptions(std::string config_path);
 
         bool read_config(std::string config_path);
 

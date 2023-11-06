@@ -1,5 +1,5 @@
-#ifndef TIERED_COMPACTOR_H_
-#define TIERED_COMPACTOR_H_
+#ifndef COMPACTOR_H_
+#define COMPACTOR_H_
 
 #include <cmath>
 #include <set>
@@ -12,17 +12,17 @@
 #include "rocksdb/listener.h"
 
 #include "spdlog/spdlog.h"
-#include "tmpdb/tiered_options.hpp"
+#include "tmpdb/compactor_options.hpp"
 
 namespace tmpdb
 {
 
-    class TieredBaseCompactor;
+    class BaseCompactor;
 
     typedef struct CompactionTask
     {
         rocksdb::DB *db;
-        TieredBaseCompactor *compactor;
+        BaseCompactor *compactor;
         const std::string &column_family_name;
         std::vector<std::string> input_file_names;
         int output_level;
@@ -45,7 +45,7 @@ namespace tmpdb
          * @param is_a_retry
          */
         CompactionTask(
-            rocksdb::DB *db, TieredBaseCompactor *compactor,
+            rocksdb::DB *db, BaseCompactor *compactor,
             const std::string &column_family_name,
             const std::vector<std::string> &input_file_names,
             const int output_level,
@@ -64,21 +64,21 @@ namespace tmpdb
               is_a_retry(is_a_retry) {}
     } CompactionTask;
 
-    class TieredBaseCompactor : public ROCKSDB_NAMESPACE::EventListener
+    class BaseCompactor : public ROCKSDB_NAMESPACE::EventListener
     {
     public:
-        TieredOptions tiered_opt;
+        CompactorOptions compactor_opt;
         rocksdb::Options rocksdb_opt;
         rocksdb::CompactionOptions rocksdb_compact_opt;
         std::vector<bool> level_being_compacted;
 
         /**
-         * @brief Construct a new Tiered Compactor object
+         * @brief Construct a new Compactor object
          *
-         * @param tiered_opt
+         * @param compactor_opt
          * @param rocksdb_opt
          */
-        TieredBaseCompactor(const TieredOptions tiered_opt, const rocksdb::Options rocksdb_opt);
+        BaseCompactor(const CompactorOptions compactor_opt, const rocksdb::Options rocksdb_opt);
 
         /**
          * @brief Picks and returns a compaction task given the specified DB and column family.
@@ -93,6 +93,17 @@ namespace tmpdb
         virtual CompactionTask *PickCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) = 0;
 
         /**
+         * @brief Picks and returns a compaction task given the specified DB and column family.
+         * It is the caller's responsibility to destroy the returned CompactionTask.
+         *
+         * @param db An open database
+         * @param cf_name Names of the column families
+         * @param level Target level id
+         *
+         * @returns CompactionTask Will return a "nullptr" if it cannot find a proper compaction task.
+         */
+        virtual CompactionTask *PickLevelCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) = 0;
+        /**
          * @brief Schedule and run the specified compaction task in background.
          *
          * @param task
@@ -100,7 +111,7 @@ namespace tmpdb
         virtual void ScheduleCompaction(CompactionTask *task) = 0;
     };
 
-    class TieredCompactor : public TieredBaseCompactor
+    class Compactor : public BaseCompactor
     {
     public:
         std::mutex compactions_left_mutex;
@@ -108,13 +119,13 @@ namespace tmpdb
         std::atomic<int> compactions_left_count;
 
         /**
-         * @brief Construct a new TieredCompactor object
+         * @brief Construct a new Compactor object
          *
-         * @param tiered_opt
+         * @param compactor_opt
          * @param rocksdb_opt
          */
-        TieredCompactor(const TieredOptions tiered_opt, const rocksdb::Options rocksdb_opt)
-            : TieredBaseCompactor(tiered_opt, rocksdb_opt), compactions_left_count(0){};
+        Compactor(const CompactorOptions compactor_opt, const rocksdb::Options rocksdb_opt)
+            : BaseCompactor(compactor_opt, rocksdb_opt), compactions_left_count(0){};
 
         /**
          * @brief
@@ -126,10 +137,10 @@ namespace tmpdb
 
         /// @brief
         /// @param db
-        /// @param tiered_opt
+        /// @param compactor_opt
         /// @param num_entries
         /// @return
-        std::vector<size_t> calculate_level_capacity(TieredOptions tiered_opt);
+        std::vector<size_t> calculate_level_capacity(CompactorOptions compactor_opt);
 
         /**
          * @brief
@@ -140,7 +151,15 @@ namespace tmpdb
          * @return CompactionTask*
          */
         CompactionTask *PickCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) override;
-
+        /**
+         * @brief
+         *
+         * @param db
+         * @param cf_name
+         * @param level
+         * @return CompactionTask*
+         */
+        CompactionTask *PickLevelCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) override;
         /**
          * @brief
          *
@@ -190,4 +209,4 @@ namespace tmpdb
 
 } /* namespace tmpdb */
 
-#endif /* TIERED_COMPACTOR_H_ */
+#endif /* COMPACTOR_H_ */

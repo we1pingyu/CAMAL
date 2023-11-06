@@ -19,13 +19,16 @@ from utils.distribution import dist_regression
 
 np.set_printoptions(suppress=True)
 
-scaling = 10.0
-N = 1e7 / scaling
-E = 1024
-Q = int(200000 / scaling)
-B = 4
+config_yaml_path = os.path.join('lrkv/config/config.yaml')
+with open(config_yaml_path) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+scaling = config['lsm_tree_config']['scaling']
+E = config['lsm_tree_config']['E'] / 8
+Q = int(config['lsm_tree_config']['Q'] / scaling)
+B = int(4000 / E)
 S = 2
-M = 2147483648 / scaling  # 256MB
+M = config['lsm_tree_config']['M'] / scaling
+N = config['lsm_tree_config']['N'] / scaling
 workloads = [
     (0.25, 0.25, 0.25, 0.25),
     (0.97, 0.01, 0.01, 0.01),
@@ -100,10 +103,11 @@ class Optimizer(object):
             row['db_name'] = 'level_optimizer'
             row['path_db'] = self.config['app']['DATABASE_PATH']
             z0, z1, q, w = workload
+            
             cf = CostFunction(
                 N,
                 1,
-                0.0000002,
+                2 / N,
                 B,
                 E,
                 M,
@@ -120,7 +124,7 @@ class Optimizer(object):
             row['N'] = N
             row['queries'] = Q
             row['M'] = M
-            row['h'] = int(nominal_design['M_filt'] / N)
+            row['h'] = nominal_design['M_filt'] / N
             row['dist'] = dist
             row['skew'] = skew
             row['cache_cap'] = 0.0
@@ -185,14 +189,15 @@ class Optimizer(object):
             row['db_name'] = 'level_optimizer'
             row['path_db'] = self.config['app']['DATABASE_PATH']
             z0, z1, q, w = workload
-            cache_cap = 16 * 1024 * 1024 * 8
+            row['cache_cap'] = 0.125 * M / 8
+            row['M'] = M - row['cache_cap'] * 8
             cf = CostFunction(
                 N,
                 1,
-                0.0000002,
+                2 / (N * scaling),
                 B,
                 E,
-                M - cache_cap,
+                row['M'],
                 True,
                 z0,
                 z1,
@@ -205,11 +210,9 @@ class Optimizer(object):
             row['T'] = int(nominal_design['T'])
             row['N'] = N
             row['queries'] = Q
-            row['M'] = M - row['cache_cap']
             row['h'] = nominal_design['M_filt'] / N
             row['dist'] = dist
             row['skew'] = skew
-            row['cache_cap'] = cache_cap / 8
             row['is_leveling_policy'] = nominal_design['is_leveling_policy']
             row['mbuf'] = nominal_design['M_buff'] / 8
             row['z0'] = z0
@@ -272,7 +275,7 @@ class Optimizer(object):
             row['T'] = 10
             row['h'] = 10
             best_h = 10
-            row['cache_cap'] = 16 * 1024 * 1024
+            row['cache_cap'] = 0.125 * M / 8
             row['M'] = M - row['cache_cap'] * 8
             self.logger.info(f'Building DB at size : {N}')
             db = RocksDB(self.config)
@@ -310,7 +313,7 @@ class Optimizer(object):
             df.append(row)
             pd.DataFrame(df).to_csv(self.config['optimizer_path']['ckpt'])
             rocksdb_t.append(row['total_latency'])
-
+            
             # learned lr optimizer
             row = copy.deepcopy(row)
             row['optimizer'] = 'lr'
@@ -333,7 +336,7 @@ class Optimizer(object):
                 best_var,
                 best_cost,
             ) = model_lr.traverse_var_optimizer_uniform(
-                level_cache_models, level_cost_models, z0, z1, q, w
+                level_cache_models, level_cost_models, z0, z1, q, w, 'level'
             )
             row['is_leveling_policy'] = True
             (
@@ -343,13 +346,7 @@ class Optimizer(object):
                 tier_best_var,
                 tier_best_cost,
             ) = model_lr.traverse_var_optimizer_uniform(
-                tier_cache_models,
-                tier_cost_models,
-                z0,
-                z1,
-                q,
-                w,
-                policy='tier',
+                tier_cache_models, tier_cost_models, z0, z1, q, w, 'tier'
             )
             print(
                 f'level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio},best_var: {best_var}, best_cost:{best_cost*Q}'

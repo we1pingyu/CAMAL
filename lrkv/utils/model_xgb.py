@@ -5,11 +5,24 @@ import xgboost as xgb
 import pickle
 import pandas as pd
 import time
+import yaml
+import os
 
 sys.path.append('./lrkv')
 from utils.lsm import estimate_level, estimate_fpr
 
 eps = 1e-5
+
+config_yaml_path = os.path.join('lrkv/config/config.yaml')
+with open(config_yaml_path) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+scaling = config['lsm_tree_config']['scaling']
+E = config['lsm_tree_config']['E'] / 8
+Q = int(config['lsm_tree_config']['Q'] / scaling)
+B = int(4000 / E)
+S = 2
+M = config['lsm_tree_config']['M'] / scaling
+N = config['lsm_tree_config']['N'] / scaling
 
 
 def iter_model(df, policy='level'):
@@ -25,6 +38,9 @@ def iter_model(df, policy='level'):
                 sample['z1'],
                 sample['q'],
                 sample['w'],
+                E,
+                M,
+                N,
             )
         )
         Y.append(sample['total_latency'] / sample['queries'])
@@ -80,7 +96,7 @@ def prepare_df(samples, save_path):
     pd.DataFrame(df).to_csv(save_path, index=False)
 
 
-def load_models(model_path, folds=10):
+def load_models(model_path, folds):
     models = []
     for fold in range(folds):
         model = pickle.load(open(model_path.replace('holder', str(fold)), 'rb'))
@@ -88,9 +104,7 @@ def load_models(model_path, folds=10):
     return models
 
 
-def get_cache(
-    current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, M=0.2147483648, N=1e6
-):
+def get_cache(current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, M, N):
     fpr = estimate_fpr(current_h)
     buffer = current_ratio * (M - current_h * N)
     cache_cap = (1 - current_ratio) * (M - current_h * N) / 8
@@ -107,14 +121,17 @@ def get_cost_uniform(
     z1,
     q,
     w,
-    M=214748364.8,
-    N=1e6,
+    E,
+    M,
+    N,
 ):
     h = current_ratio * current_h
     fpr = estimate_fpr(h)
+    # print(M, h, N)
     buffer = current_ratio * (M - current_h * N) / 8
     cache_cap = (1 - current_ratio) * M / 8
-    l = estimate_level(N, buffer, current_T)
+    l = estimate_level(N, buffer, current_T, E)
+    # print(N, buffer, current_T, E, l)
     # is_leveling_policy = 1 if is_leveling_policy else 0
     return [z0, z1, q, w, current_T, l, fpr, cache_cap, buffer]
 
@@ -130,8 +147,8 @@ def get_cost(
     q,
     w,
     y_cache,
-    M=214748364.8,
-    N=1e6,
+    M,
+    N,
 ):
     fpr = estimate_fpr(current_h)
     buffer = current_ratio * (M - current_h * N)
@@ -140,7 +157,7 @@ def get_cost(
     return [alpha, c, z0, z1, q, w, current_T, l, fpr, cache_cap, buffer, y_cache]
 
 
-def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e6):
+def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w):
     start_time = time.time()
     costs = []
     xs = []
@@ -148,7 +165,7 @@ def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e6):
     for T in range(2, 78):
         for h in range(2, 15):
             for ratio in [0.7, 0.8, 0.9, 1.0]:
-                x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
+                x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
                 settings.append((T, h, ratio, None))
                 xs.append(x)
     for cost_model in cost_models:
@@ -170,9 +187,7 @@ def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, N=1e6):
     )
 
 
-def traverse_var_optimizer_uniform_T(
-    cost_models, policy, z0, z1, q, w, M=214748364.8, N=1e6
-):
+def traverse_var_optimizer_uniform_T(cost_models, policy, z0, z1, q, w, M, N):
     start_time = time.time()
     costs = []
     xs = []
@@ -180,7 +195,7 @@ def traverse_var_optimizer_uniform_T(
     for T in range(2, 78):
         h = 10
         ratio = 1
-        x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
+        x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
         settings.append((T, h, ratio, None))
         xs.append(x)
     for cost_model in cost_models:
@@ -195,9 +210,7 @@ def traverse_var_optimizer_uniform_T(
     return candidate[1][0], candidate[1][1], candidate[1][2], None, candidate[0]
 
 
-def traverse_var_optimizer_uniform_memory(
-    cost_models, policy, z0, z1, q, w, M=214748364.8, N=1e6
-):
+def traverse_var_optimizer_uniform_memory(cost_models, policy, z0, z1, q, w, M, N):
     start_time = time.time()
     costs = []
     xs = []
@@ -205,7 +218,7 @@ def traverse_var_optimizer_uniform_memory(
     for T in range(2, 78):
         for h in range(2, 15):
             ratio = 1
-            x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
+            x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
             settings.append((T, h, ratio, None))
             xs.append(x)
     for cost_model in cost_models:
@@ -227,7 +240,7 @@ def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e6, n=10):
         ratio = ratio0
         costs = []
         for cost_model in cost_models:
-            x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
+            x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
             costs.append(
                 max(cost_model.predict(np.array([x]).reshape((1, -1)))[0], eps)
             )
@@ -245,7 +258,7 @@ def traverse_for_h(cost_models, z0, z1, q, w, T0=10, ratio0=1.0, N=1e6, n=10):
         ratio = ratio0
         costs = []
         for cost_model in cost_models:
-            x = get_cost_uniform(T, h, ratio, z0, z1, q, w, N=N)
+            x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
             costs.append(
                 max(cost_model.predict(np.array([x]).reshape((1, -1)))[0], eps)
             )
@@ -256,122 +269,122 @@ def traverse_for_h(cost_models, z0, z1, q, w, T0=10, ratio0=1.0, N=1e6, n=10):
     return candidates[:n]
 
 
-def simulated_annealing(
-    cache_model: xgb.XGBRegressor,
-    cost_model: xgb.XGBRegressor,
-    init_T,
-    init_h,
-    init_ratio,
-    alpha,
-    c,
-    z0,
-    z1,
-    q,
-    w,
-    temperature=100,
-    cooling_rate=0.99,
-):
-    current_T, current_h, current_ratio = [init_T, init_h, init_ratio]
-    x_cache = get_cache(current_T, current_h, current_ratio, alpha, c, z0, z1, q, w)
-    y_cache = cache_model.predict([x_cache])[0]
-    x_cost = get_cost(
-        current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, y_cache
-    )
-    current_cost = cost_model.predict([x_cost])[0]
-    best_T, best_h, best_ratio = current_T, current_h, current_ratio
-    best_cost = current_cost
-    while temperature > 1e-8:
-        new_T = current_T + random.choice([-1, 0, 1])
-        new_h = current_h + random.choice([-1, 0, 1])
-        new_ratio = current_ratio + random.choice([-0.1, 0, 0.1])
-        if 2 <= new_T <= 16 and 8 <= new_h <= 13 and 0.25 <= new_ratio < 1.0:
-            x_cache = get_cache(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w)
-            y_cache = cache_model.predict([x_cache])[0]
-            x_cost = get_cost(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w, y_cache)
-            new_cost = cost_model.predict([x_cost])[0]
-            delta_cost = new_cost - current_cost
-            if delta_cost < 0:
-                current_T, current_h, current_ratio = new_T, new_h, new_ratio
-                current_cost = new_cost
-                if current_cost < best_cost:
-                    best_T, best_h, best_ratio = current_T, current_h, current_ratio
-                    best_cost = current_cost
-            elif np.exp(-delta_cost / temperature) > random.uniform(0, 1):
-                current_T, current_h, current_ratio = new_T, new_h, new_ratio
-                current_cost = new_cost
-            # print(f'T: {current_T}, h: {current_h}, ratio: {current_ratio}, cost: {current_cost}')
-            temperature *= cooling_rate
-    return best_T, best_h, best_ratio, best_cost
+# def simulated_annealing(
+#     cache_model: xgb.XGBRegressor,
+#     cost_model: xgb.XGBRegressor,
+#     init_T,
+#     init_h,
+#     init_ratio,
+#     alpha,
+#     c,
+#     z0,
+#     z1,
+#     q,
+#     w,
+#     temperature=100,
+#     cooling_rate=0.99,
+# ):
+#     current_T, current_h, current_ratio = [init_T, init_h, init_ratio]
+#     x_cache = get_cache(current_T, current_h, current_ratio, alpha, c, z0, z1, q, w)
+#     y_cache = cache_model.predict([x_cache])[0]
+#     x_cost = get_cost(
+#         current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, y_cache
+#     )
+#     current_cost = cost_model.predict([x_cost])[0]
+#     best_T, best_h, best_ratio = current_T, current_h, current_ratio
+#     best_cost = current_cost
+#     while temperature > 1e-8:
+#         new_T = current_T + random.choice([-1, 0, 1])
+#         new_h = current_h + random.choice([-1, 0, 1])
+#         new_ratio = current_ratio + random.choice([-0.1, 0, 0.1])
+#         if 2 <= new_T <= 16 and 8 <= new_h <= 13 and 0.25 <= new_ratio < 1.0:
+#             x_cache = get_cache(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w)
+#             y_cache = cache_model.predict([x_cache])[0]
+#             x_cost = get_cost(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w, y_cache)
+#             new_cost = cost_model.predict([x_cost])[0]
+#             delta_cost = new_cost - current_cost
+#             if delta_cost < 0:
+#                 current_T, current_h, current_ratio = new_T, new_h, new_ratio
+#                 current_cost = new_cost
+#                 if current_cost < best_cost:
+#                     best_T, best_h, best_ratio = current_T, current_h, current_ratio
+#                     best_cost = current_cost
+#             elif np.exp(-delta_cost / temperature) > random.uniform(0, 1):
+#                 current_T, current_h, current_ratio = new_T, new_h, new_ratio
+#                 current_cost = new_cost
+#             # print(f'T: {current_T}, h: {current_h}, ratio: {current_ratio}, cost: {current_cost}')
+#             temperature *= cooling_rate
+#     return best_T, best_h, best_ratio, best_cost
 
 
-def get_candidate_simulated_annealing(
-    # cache_model: xgb.XGBRegressor,
-    cost_models,
-    init_T,
-    init_h,
-    init_ratio,
-    alpha,
-    c,
-    z0,
-    z1,
-    q,
-    w,
-    temperature=100,
-    cooling_rate=0.99,
-):
-    results = []
-    current_T, current_h, current_ratio = [init_T, init_h, init_ratio]
-    x_cache = get_cache(current_T, current_h, current_ratio, alpha, c, z0, z1, q, w)
-    # y_cache = cache_model.predict([x_cache])[0]
-    # x_cost = get_cost(
-    #     current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, y_cache
-    # )
-    current_costs = []
-    for cost_model in cost_models:
-        current_costs.append(
-            max(cost_model.predict(np.array([x_cache]).reshape((1, -1)))[0], eps)
-        )
-    current_cost = np.mean(current_costs)
-    best_T, best_h, best_ratio = current_T, current_h, current_ratio
-    best_cost = current_cost
-    results.append([best_T, best_h, best_ratio, best_cost])
-    while temperature > 1e-5:
-        new_T = current_T + random.choice([-1, 0, 1])
-        new_h = current_h + random.choice([-1, 0, 1])
-        new_ratio = current_ratio + random.choice([-0.1, 0, 0.1])
-        if 2 <= new_T <= 16 and 8 <= new_h <= 13 and 0.25 <= new_ratio < 1.0:
-            x_cache = get_cache(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w)
-            # y_cache = cache_model.predict([x_cache])[0]
-            # x_cost = get_cost(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w, y_cache)
-            new_costs = []
-            for cost_model in cost_models:
-                new_costs.append(
-                    max(
-                        cost_model.predict(np.array([x_cache]).reshape((1, -1)))[0], eps
-                    )
-                )
-            new_cost = np.mean(new_costs)
-            delta_cost = new_cost - current_cost
-            if delta_cost < 0:
-                current_T, current_h, current_ratio = new_T, new_h, new_ratio
-                current_cost = new_cost
-                if current_cost < best_cost:
-                    best_T, best_h, best_ratio = current_T, current_h, current_ratio
-                    best_cost = current_cost
-                    results.append([best_T, best_h, best_ratio, best_cost])
-            elif np.exp(-delta_cost / temperature) > random.uniform(0, 1):
-                results.append([current_T, current_h, current_ratio, current_cost])
-                current_T, current_h, current_ratio = new_T, new_h, new_ratio
-                current_cost = new_cost
-                results.append([current_T, current_h, current_ratio, current_cost])
-            # print(f'T: {current_T}, h: {current_h}, ratio: {current_ratio}, cost: {current_cost}')
-            temperature *= cooling_rate
-    results.sort(key=lambda x: x[-1])
-    new_results = []
-    for result in results:
-        T, h, ratio, _ = result
-        if [T, h, ratio] not in new_results:
-            new_results.append([T, h, ratio])
-            if len(new_results) > 10:
-                break
-    return new_results
+# def get_candidate_simulated_annealing(
+#     # cache_model: xgb.XGBRegressor,
+#     cost_models,
+#     init_T,
+#     init_h,
+#     init_ratio,
+#     alpha,
+#     c,
+#     z0,
+#     z1,
+#     q,
+#     w,
+#     temperature=100,
+#     cooling_rate=0.99,
+# ):
+#     results = []
+#     current_T, current_h, current_ratio = [init_T, init_h, init_ratio]
+#     x_cache = get_cache(current_T, current_h, current_ratio, alpha, c, z0, z1, q, w)
+#     # y_cache = cache_model.predict([x_cache])[0]
+#     # x_cost = get_cost(
+#     #     current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, y_cache
+#     # )
+#     current_costs = []
+#     for cost_model in cost_models:
+#         current_costs.append(
+#             max(cost_model.predict(np.array([x_cache]).reshape((1, -1)))[0], eps)
+#         )
+#     current_cost = np.mean(current_costs)
+#     best_T, best_h, best_ratio = current_T, current_h, current_ratio
+#     best_cost = current_cost
+#     results.append([best_T, best_h, best_ratio, best_cost])
+#     while temperature > 1e-5:
+#         new_T = current_T + random.choice([-1, 0, 1])
+#         new_h = current_h + random.choice([-1, 0, 1])
+#         new_ratio = current_ratio + random.choice([-0.1, 0, 0.1])
+#         if 2 <= new_T <= 16 and 8 <= new_h <= 13 and 0.25 <= new_ratio < 1.0:
+#             x_cache = get_cache(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w)
+#             # y_cache = cache_model.predict([x_cache])[0]
+#             # x_cost = get_cost(new_T, new_h, new_ratio, alpha, c, z0, z1, q, w, y_cache)
+#             new_costs = []
+#             for cost_model in cost_models:
+#                 new_costs.append(
+#                     max(
+#                         cost_model.predict(np.array([x_cache]).reshape((1, -1)))[0], eps
+#                     )
+#                 )
+#             new_cost = np.mean(new_costs)
+#             delta_cost = new_cost - current_cost
+#             if delta_cost < 0:
+#                 current_T, current_h, current_ratio = new_T, new_h, new_ratio
+#                 current_cost = new_cost
+#                 if current_cost < best_cost:
+#                     best_T, best_h, best_ratio = current_T, current_h, current_ratio
+#                     best_cost = current_cost
+#                     results.append([best_T, best_h, best_ratio, best_cost])
+#             elif np.exp(-delta_cost / temperature) > random.uniform(0, 1):
+#                 results.append([current_T, current_h, current_ratio, current_cost])
+#                 current_T, current_h, current_ratio = new_T, new_h, new_ratio
+#                 current_cost = new_cost
+#                 results.append([current_T, current_h, current_ratio, current_cost])
+#             # print(f'T: {current_T}, h: {current_h}, ratio: {current_ratio}, cost: {current_cost}')
+#             temperature *= cooling_rate
+#     results.sort(key=lambda x: x[-1])
+#     new_results = []
+#     for result in results:
+#         T, h, ratio, _ = result
+#         if [T, h, ratio] not in new_results:
+#             new_results.append([T, h, ratio])
+#             if len(new_results) > 10:
+#                 break
+#     return new_results

@@ -6,6 +6,7 @@ import sys
 import random
 import time
 import os
+import yaml
 from datetime import datetime
 
 sys.path.append('./lrkv')
@@ -16,15 +17,19 @@ from sklearn.model_selection import KFold
 
 np.set_printoptions(suppress=True)
 
-scaling = 10
-E = 1000
-Q = int(200000 / scaling)
-B = 4
-S = 2
-M = 2147483648 / scaling  # 256MB
 
-level_data = 'raw_data/samples_sim_xgb_level_uniform_final.csv'
-tier_data = 'raw_data/samples_sim_xgb_tier_uniform_final.csv'
+config_yaml_path = os.path.join('lrkv/config/config.yaml')
+with open(config_yaml_path) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+scaling = config['lsm_tree_config']['scaling']
+E = config['lsm_tree_config']['E'] / 8
+Q = int(config['lsm_tree_config']['Q'] / scaling)
+B = int(4000 / E)
+S = 2
+M = config['lsm_tree_config']['M'] / scaling
+N = config['lsm_tree_config']['N'] / scaling
+level_data = config['samples_path']['xgb_level_final']
+tier_data = config['samples_path']['xgb_tier_final']
 fold = 15
 
 for num_sample in [100]:
@@ -55,8 +60,9 @@ for num_sample in [100]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
+                E,
                 M,
-                sample['N'],
+                N,
             )
         )
         y = sample['total_latency'] / sample['queries']
@@ -74,7 +80,7 @@ for num_sample in [100]:
         X_train = X[train_index]
         Y_train = Y[train_index]
         weights = 1 / Y_train
-        regr = xgb.XGBRegressor(learning_rate=1)
+        regr = xgb.XGBRegressor()
         # Train the XGBoost cache model
         regr.fit(X_train, Y_train)
         X_test = X[test_index]
@@ -113,8 +119,9 @@ for num_sample in [100]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
+                E,
                 M,
-                sample['N'],
+                N,
             )
         )
         y = sample['total_latency'] / sample['queries']
@@ -133,7 +140,7 @@ for num_sample in [100]:
         X_train = X[train_index]
         Y_train = Y[train_index]
         weights = 1 / Y_train
-        regr = xgb.XGBRegressor(learning_rate=1)
+        regr = xgb.XGBRegressor()
 
         # Train the XGBoost cache model
         regr.fit(X_train, Y_train)

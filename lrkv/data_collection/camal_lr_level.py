@@ -42,12 +42,19 @@ workloads = [
     (0.01, 0.33, 0.33, 0.33),
 ]
 
-scaling = 10.0
-M = 2147483648 / scaling  # 256MB
-n_estimators = 100
-N = 1e7 / scaling
-queries = int(200000 / scaling)
-fold = 10
+config_yaml_path = os.path.join('lrkv/config/config.yaml')
+with open(config_yaml_path) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+scaling = config['lsm_tree_config']['scaling']
+E = config['lsm_tree_config']['E'] / 8
+Q = int(config['lsm_tree_config']['Q'] / scaling)
+B = int(4000 / E)
+S = 2
+M = config['lsm_tree_config']['M'] / scaling
+N = config['lsm_tree_config']['N'] / scaling
+level_data = config['samples_path']['xgb_level_final']
+tier_data = config['samples_path']['xgb_tier_final']
+fold = 15
 
 
 class LevelCost(object):
@@ -189,14 +196,14 @@ class LevelCost(object):
             z0, z1, q, w = workload
             # Train and search optimal size ratio
             min_err = 1e9
-            for T in range(2, estimate_T(N, M / 2 / 8, 1) + 1):
+            for T in range(2, estimate_T(N, M / 2 / 8, 1, E) + 1):
                 err = T_level_equation(T, q, w)
                 if err < min_err:
                     min_err = err
                     temp = T
             if len(df) == 0:
                 T_list = self.sample_around_x0(
-                    temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1)
+                    temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1,E)
                 )
             else:
                 Wc, W = iter_model(df, policy='level')
@@ -240,7 +247,7 @@ class LevelCost(object):
 
             min_err = 1e9
             for h in range(2, 15):
-                err = h_mbuf_level_equation(h * N, z0, z1, q, w, T0, N, M)
+                err = h_mbuf_level_equation(h * N, z0, z1, q, w, T0, E, M, N)
                 if err < min_err:
                     min_err = err
                     temp = h

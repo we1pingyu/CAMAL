@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
 import pickle as pkl
-from sklearn.model_selection import KFold
 import sys
 import time
+import yaml
+import os
+from sklearn.model_selection import KFold
 
 sys.path.append('./lrkv')
 from utils.lsm import estimate_fpr, estimate_level
@@ -13,17 +15,19 @@ from sklearn.linear_model import LinearRegression
 
 np.set_printoptions(suppress=True)
 
-scaling = 10
-E = 1000
-Q = int(200000 / scaling)
-B = 4
+config_yaml_path = os.path.join('lrkv/config/config.yaml')
+with open(config_yaml_path) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+scaling = config['lsm_tree_config']['scaling']
+E = config['lsm_tree_config']['E'] / 8
+Q = int(config['lsm_tree_config']['Q'] / scaling)
+B = int(4000 / E)
 S = 2
-M = 2147483648 / scaling  # 256MB
-fold = 15
-
-level_data = 'raw_data/samples_sim_xgb_level_uniform_final.csv'
-tier_data = 'raw_data/samples_sim_xgb_tier_uniform_final.csv'
-
+M = config['lsm_tree_config']['M'] / scaling
+N = config['lsm_tree_config']['N'] / scaling
+level_data = config['samples_path']['xgb_level_final']
+tier_data = config['samples_path']['xgb_tier_final']
+fold = 15   
 for num_sample in [100]:
     start_time = time.time()
     all_samples = pd.read_csv(level_data)
@@ -50,8 +54,6 @@ for num_sample in [100]:
             sample['z1'],
             sample['q'],
             sample['w'],
-            M,
-            sample['N'],
         )
         Xc.append(xc)
         Yc.append(np.log(sample['cache_hit_rate'] + eps))
@@ -65,8 +67,6 @@ for num_sample in [100]:
                 sample['q'],
                 sample['w'],
                 sample['cache_hit_rate'] + eps,
-                M,
-                sample['N'],
             )
         )
         y = (sample['total_latency']) / sample['queries']
@@ -74,7 +74,7 @@ for num_sample in [100]:
 
     Xc = np.array(Xc)
     Yc = np.array(Yc)
-    print(Xc.shape)
+    # print(Xc.shape)s
     Wc = np.linalg.lstsq(Xc, Yc, rcond=-1)[0]
 
     X = np.array(X)
@@ -107,8 +107,9 @@ for num_sample in [100]:
         Y_test = Y[test_index]
         error = abs(y_hat - Y_test)
         rerror = abs(y_hat - Y_test) / Y_test
-        for _y_hat, _y, _error, _rerror in zip(y_hat, Y_test, error, rerror):
+        for x, _y_hat, _y, _error, _rerror in zip(X_test, y_hat, Y_test, error, rerror):
             # print('=' * 50)
+            # print(x)
             # print(_y_hat, _y)
             # print(_error, _rerror)
             errors.append(_error)
@@ -143,8 +144,6 @@ for num_sample in [100]:
             sample['z1'],
             sample['q'],
             sample['w'],
-            M,
-            sample['N'],
         )
         Xc.append(xc)
         Yc.append(np.log(sample['cache_hit_rate'] + eps))
@@ -158,8 +157,6 @@ for num_sample in [100]:
                 sample['q'],
                 sample['w'],
                 sample['cache_hit_rate'] + eps,
-                M,
-                sample['N'],
             )
         )
         y = (sample['total_latency']) / sample['queries']

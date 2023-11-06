@@ -12,13 +12,14 @@ app:
     KEY_FILE_PATH: "data/keys.data"
 
 lsm_tree_config: 
+    scaling: 5.0
+    M : 268435456
     N: 10000000
+    Q: 100000
     phi: 1
     s: 0.0000002        # Average range query selectivity
-    B: 4            # Number of entries that fit in a disk page
-    E: 8000         # Size of data entries in bits
-    M: 8589934592   # Total memory budget of 1 GiB
-    is_leveling_policy: False  # Leveling or Tiering policy
+    B: 32            # Number of entries that fit in a disk page
+    E: 1000         # Size of data entries in bits
 
 jobs:
     job_list:

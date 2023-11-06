@@ -17,7 +17,6 @@ from lsm_tree.cost_function import CostFunction
 from utils.model_xgb import get_cost_uniform, traverse_for_T, traverse_for_h, iter_model
 from utils.distribution import dist_regression, generate_key_log
 from utils.lsm import *
-from utils.model_xgb import get_candidate_simulated_annealing, get_cost, get_cache
 
 workloads = [
     (0.25, 0.25, 0.25, 0.25),
@@ -37,12 +36,19 @@ workloads = [
     (0.01, 0.33, 0.33, 0.33),
 ]
 
-scaling = 10.0
-M = 2147483648 / scaling  # 256MB
-n_estimators = 100
-N = 1e7 / scaling
-queries = int(200000 / scaling)
-fold = 10
+config_yaml_path = os.path.join('lrkv/config/config.yaml')
+with open(config_yaml_path) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+scaling = config['lsm_tree_config']['scaling']
+E = config['lsm_tree_config']['E'] / 8
+Q = int(config['lsm_tree_config']['Q'] / scaling)
+B = int(4000 / E)
+S = 2
+M = config['lsm_tree_config']['M'] / scaling
+N = config['lsm_tree_config']['N'] / scaling
+level_data = config['samples_path']['xgb_level_final']
+tier_data = config['samples_path']['xgb_tier_final']
+fold = 15
 
 
 class LevelCost(object):
@@ -184,14 +190,14 @@ class LevelCost(object):
             z0, z1, q, w = workload
             # Train and search optimal size ratio
             min_err = 1e9
-            for T in range(2, estimate_T(N, M / 2 / 8, 1) + 1):
-                err = T_tier_equation(T, z0, z1, q, w, N=N, M=M)
+            for T in range(2, estimate_T(N, M / 2 / 8, 1, E) + 1):
+                err = T_tier_equation(T, z0, z1, q, w, E, M, N)
                 if err < min_err:
                     min_err = err
                     temp = T
-            if len(df) == 0:
+            if df == []:
                 T_list = self.sample_around_x0(
-                    temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1) + 1
+                    temp, self.samples, 2, estimate_T(N, M / 2 / 8, 1, E) + 1
                 )
             else:
                 regr = iter_model(df, 'tier')
@@ -218,7 +224,7 @@ class LevelCost(object):
                     dist,
                     skew,
                     cache_cap,
-                    queries,
+                    Q,
                     key_log,
                 )
                 # print(row)
@@ -234,7 +240,7 @@ class LevelCost(object):
 
             min_err = 1e9
             for h in range(2, 15):
-                err = h_mbuf_level_equation(h, z0, z1, q, w, T0, N, M)
+                err = h_mbuf_level_equation(h, z0, z1, q, w, T0, E, M, N)
                 if err < min_err:
                     min_err = err
                     temp = h
@@ -261,7 +267,7 @@ class LevelCost(object):
                     dist,
                     skew,
                     cache_cap,
-                    queries,
+                    Q,
                     key_log,
                 )
                 # print(row)
@@ -286,14 +292,13 @@ class LevelCost(object):
                     ratio,
                     N,
                     buffer,
-                    h0,
+                    h0 * ratio,
                     dist,
                     skew,
                     cache_cap,
-                    queries,
+                    Q,
                     key_log,
                 )
-                # print(row)
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config['samples_path']['xgb_tier_ckpt'])
                 step += 1

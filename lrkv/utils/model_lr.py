@@ -6,11 +6,23 @@ import pickle
 import pandas as pd
 import time
 import pickle as pkl
+import yaml
+import os
 
 sys.path.append('./lrkv')
 from utils.lsm import estimate_level, estimate_fpr
 
 eps = 1e-5
+config_yaml_path = os.path.join('lrkv/config/config.yaml')
+with open(config_yaml_path) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
+scaling = config['lsm_tree_config']['scaling']
+E = config['lsm_tree_config']['E'] / 8
+Q = int(config['lsm_tree_config']['Q'] / scaling)
+B = int(4000 / E)
+S = 2
+M = config['lsm_tree_config']['M'] / scaling
+N = config['lsm_tree_config']['N'] / scaling
 
 
 def iter_model(df, policy='level'):
@@ -41,6 +53,9 @@ def iter_model(df, policy='level'):
                     sample['q'],
                     sample['w'],
                     sample['cache_hit_rate'],
+                    E,
+                    M,
+                    sample['N'],
                 )
             )
         else:
@@ -54,6 +69,9 @@ def iter_model(df, policy='level'):
                     sample['q'],
                     sample['w'],
                     sample['cache_hit_rate'],
+                    E,
+                    M,
+                    sample['N'],
                 )
             )
         Y.append(sample['total_latency'] / sample['queries'])
@@ -102,7 +120,7 @@ def traverse_for_h(
             xc = get_cache_uniform(T, h, ratio, z0, z1, q, w)
             yc = np.clip(np.exp(np.dot(xc, Wc)), 0, 1)
             if policy == 'level':
-                x = get_level_cost(T, h, ratio, z0, z1, q, w, yc)
+                x = get_level_cost(T, h, ratio, z0, z1, q, w, yc, E, M, N)
             else:
                 x = get_tier_cost(T, h, ratio, z0, z1, q, w, yc)
             y = np.dot(x, W)
@@ -147,8 +165,6 @@ def get_cache_uniform(
     z1,
     q,
     w,
-    M=214748364.8,
-    N=1e6,
 ):
     buffer = current_ratio * (M - current_h * N)
     h = current_ratio * current_h
@@ -156,7 +172,8 @@ def get_cache_uniform(
     cache_cap = (1 - current_ratio) * M / 8
     # print('buffer:', current_ratio, M, current_h)
     # print('cache:', N, buffer, current_T)
-    l = estimate_level(N, buffer, current_T)
+    # print(current_ratio, M, current_h, N)
+    l = estimate_level(N, buffer, current_T, E)
     xc = [1]
     for power in (z0, z1, q, w, 1):
         for x in (l, current_T, fpr, cache_cap, buffer):
@@ -173,13 +190,11 @@ def get_level_cost(
     q,
     w,
     y_cache,
-    M=214748364.8,
-    N=1e6,
 ):
     buffer = current_ratio * (M - current_h * N)
     h = current_ratio * current_h
     fpr = estimate_fpr(h)
-    l = estimate_level(N, buffer, current_T)
+    l = estimate_level(N, buffer, current_T, E)
     yc = 1 - y_cache
     z00 = z0 * fpr * yc  # endure model
     z01 = z0 * yc  # blocks fall in L0 without bf
@@ -207,13 +222,11 @@ def get_tier_cost(
     q,
     w,
     y_cache,
-    M=214748364.8,
-    N=1e6,
 ):
     h = current_ratio * current_h
     fpr = estimate_fpr(h)
     buffer = current_ratio * (M - current_h * N)
-    l = estimate_level(N, buffer, current_T)
+    l = estimate_level(N, buffer, current_T, E)
     yc = 1 - y_cache  # cache miss rate
     z00 = z0 * fpr * yc  # endure model
     z01 = z0 * fpr * current_T * yc  # endure model
@@ -361,9 +374,7 @@ def traverse_var_optimizer(
     return candidates[0]
 
 
-def traverse_var_optimizer_uniform(
-    Wcs, Ws, z0, z1, q, w, policy='level', N=1e6, M=214748364.8
-):
+def traverse_var_optimizer_uniform(Wcs, Ws, z0, z1, q, w, policy):
     start_time = time.time()
     candidates = []
     for T in range(2, 78):
@@ -371,12 +382,13 @@ def traverse_var_optimizer_uniform(
             for ratio in [0.7, 0.8, 0.9, 1.0]:
                 costs = []
                 for Wc, W in zip(Wcs, Ws):
-                    xc = get_cache_uniform(T, h, ratio, z0, z1, q, w, N=N, M=M)
+                    xc = get_cache_uniform(T, h, ratio, z0, z1, q, w)
+                    # print(xc)
                     yc = np.clip(np.exp(np.dot(xc, Wc)), 0, 1)
                     if policy == 'level':
-                        x = get_level_cost(T, h, ratio, z0, z1, q, w, yc, N=N, M=M)
+                        x = get_level_cost(T, h, ratio, z0, z1, q, w, yc)
                     else:
-                        x = get_tier_cost(T, h, ratio, z0, z1, q, w, yc, N=N, M=M)
+                        x = get_tier_cost(T, h, ratio, z0, z1, q, w, yc)
                     costs.append(max(np.dot(x, W), eps))
                 candidates.append([T, h, ratio, np.var(costs), np.mean(costs)])
     candidates.sort(key=lambda x: x[-1])
