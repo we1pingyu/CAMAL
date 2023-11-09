@@ -219,6 +219,7 @@ int main(int argc, char *argv[])
         rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
         rocksdb_opt.disable_auto_compactions = true;
         rocksdb_opt.write_buffer_size = env.B;
+        compactor_opt.tiered_policy = false;
         compactor_opt.size_ratio = env.T;
         compactor_opt.buffer_size = env.B;
         compactor_opt.entry_size = env.E;
@@ -284,8 +285,8 @@ int main(int argc, char *argv[])
     }
 
     std::map<std::string, uint64_t> stats;
-    uint64_t num_running_compactions, num_pending_compactions, num_running_flushes, num_pending_flushes;
-    // uint64_t num_running_flushes, num_pending_flushes;
+    // uint64_t num_running_compactions, num_pending_compactions, num_running_flushes, num_pending_flushes;
+    uint64_t num_running_flushes, num_pending_flushes;
     KeyLog *key_log = new KeyLog(env.key_log_file);
     rocksdb::WriteOptions write_opt;
     write_opt.low_pri = true; //> every insert is less important than compaction
@@ -315,23 +316,23 @@ int main(int argc, char *argv[])
     spdlog::info("Waiting for all compactions to finish before running");
     rocksdb::FlushOptions flush_opt;
     // db->Flush(flush_opt);
-    if (env.compaction_style == "level")
-    {
-        while (true)
-        {
-            db->GetIntProperty(DB::Properties::kNumRunningFlushes,
-                               &num_running_flushes);
-            db->GetIntProperty(DB::Properties::kMemTableFlushPending,
-                               &num_pending_flushes);
-            db->GetIntProperty(DB::Properties::kNumRunningCompactions,
-                               &num_running_compactions);
-            db->GetIntProperty(DB::Properties::kCompactionPending,
-                               &num_pending_compactions);
-            if (num_running_compactions == 0 && num_pending_compactions == 0 && num_running_flushes == 0 && num_pending_flushes == 0)
-                break;
-        }
-    }
-    else
+    // if (env.compaction_style == "level")
+    // {
+    //     while (true)
+    //     {
+    //         db->GetIntProperty(DB::Properties::kNumRunningFlushes,
+    //                            &num_running_flushes);
+    //         db->GetIntProperty(DB::Properties::kMemTableFlushPending,
+    //                            &num_pending_flushes);
+    //         db->GetIntProperty(DB::Properties::kNumRunningCompactions,
+    //                            &num_running_compactions);
+    //         db->GetIntProperty(DB::Properties::kCompactionPending,
+    //                            &num_pending_compactions);
+    //         if (num_running_compactions == 0 && num_pending_compactions == 0 && num_running_flushes == 0 && num_pending_flushes == 0)
+    //             break;
+    //     }
+    // }
+    // else
     {
         while (true)
         {
@@ -439,23 +440,23 @@ int main(int argc, char *argv[])
     // spdlog::info("Flushing DB...");
     db->Flush(flush_opt);
     spdlog::info("Waiting for all remaining background compactions to finish");
-    if (env.compaction_style == "level")
-    {
-        while (true)
-        {
-            db->GetIntProperty(DB::Properties::kNumRunningFlushes,
-                               &num_running_flushes);
-            db->GetIntProperty(DB::Properties::kMemTableFlushPending,
-                               &num_pending_flushes);
-            db->GetIntProperty(DB::Properties::kNumRunningCompactions,
-                               &num_running_compactions);
-            db->GetIntProperty(DB::Properties::kCompactionPending,
-                               &num_pending_compactions);
-            if (num_running_compactions == 0 && num_pending_compactions == 0 && num_running_flushes == 0 && num_pending_flushes == 0)
-                break;
-        }
-    }
-    else
+    // if (env.compaction_style == "level")
+    // {
+    //     while (true)
+    //     {
+    //         db->GetIntProperty(DB::Properties::kNumRunningFlushes,
+    //                            &num_running_flushes);
+    //         db->GetIntProperty(DB::Properties::kMemTableFlushPending,
+    //                            &num_pending_flushes);
+    //         db->GetIntProperty(DB::Properties::kNumRunningCompactions,
+    //                            &num_running_compactions);
+    //         db->GetIntProperty(DB::Properties::kCompactionPending,
+    //                            &num_pending_compactions);
+    //         if (num_running_compactions == 0 && num_pending_compactions == 0 && num_running_flushes == 0 && num_pending_flushes == 0)
+    //             break;
+    //     }
+    // }
+    // else
     {
         while (true)
         {

@@ -13,7 +13,7 @@ app:
 
 lsm_tree_config: 
     samples: 3
-    scaling: 1.0
+    scaling: 10.0
     M : 268435456
     N: 10000000
     Q: 100000
