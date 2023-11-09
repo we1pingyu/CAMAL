@@ -13,19 +13,8 @@ from utils.lsm import estimate_level, estimate_fpr
 
 eps = 1e-5
 
-config_yaml_path = os.path.join('lrkv/config/config.yaml')
-with open(config_yaml_path) as f:
-    config = yaml.load(f, Loader=yaml.FullLoader)
-scaling = config['lsm_tree_config']['scaling']
-E = config['lsm_tree_config']['E'] / 8
-Q = int(config['lsm_tree_config']['Q'] / scaling)
-B = int(4000 / E)
-S = 2
-M = config['lsm_tree_config']['M'] / scaling
-N = config['lsm_tree_config']['N'] / scaling
 
-
-def iter_model(df, policy='level'):
+def iter_model(df, policy, E, M, N):
     X = []
     Y = []
     for sample in df:
@@ -157,13 +146,13 @@ def get_cost(
     return [alpha, c, z0, z1, q, w, current_T, l, fpr, cache_cap, buffer, y_cache]
 
 
-def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w):
+def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, E, M, N):
     start_time = time.time()
     costs = []
     xs = []
     settings = []
-    for T in range(2, 78):
-        for h in range(2, 15):
+    for T in range(2, 16):
+        for h in range(4, 11):
             for ratio in [0.7, 0.8, 0.9, 1.0]:
                 x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
                 settings.append((T, h, ratio, None))
@@ -210,7 +199,7 @@ def traverse_var_optimizer_uniform_T(cost_models, policy, z0, z1, q, w, M, N):
     return candidate[1][0], candidate[1][1], candidate[1][2], None, candidate[0]
 
 
-def traverse_var_optimizer_uniform_memory(cost_models, policy, z0, z1, q, w, M, N):
+def traverse_var_optimizer_uniform_memory(cost_models, policy, z0, z1, q, w, E, M, N):
     start_time = time.time()
     costs = []
     xs = []
@@ -233,9 +222,9 @@ def traverse_var_optimizer_uniform_memory(cost_models, policy, z0, z1, q, w, M, 
     return candidate[1][0], candidate[1][1], candidate[1][2], None, candidate[0]
 
 
-def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e6, n=10):
+def traverse_for_T(cost_models, z0, z1, q, w, E, M, N, h0=10, ratio0=1.0, n=10):
     candidates = []
-    for T in range(2, 78):
+    for T in range(2, 16):
         h = h0
         ratio = ratio0
         costs = []
@@ -251,9 +240,9 @@ def traverse_for_T(cost_models, z0, z1, q, w, h0=16, ratio0=1.0, N=1e6, n=10):
     return candidates[:n]
 
 
-def traverse_for_h(cost_models, z0, z1, q, w, T0=10, ratio0=1.0, N=1e6, n=10):
+def traverse_for_h(cost_models, z0, z1, q, w, E, M, N, T0=10, ratio0=1.0, n=10):
     candidates = []
-    for h in range(2, 15):
+    for h in range(4, 11):
         T = T0
         ratio = ratio0
         costs = []

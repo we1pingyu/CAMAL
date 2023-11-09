@@ -18,16 +18,9 @@ np.set_printoptions(suppress=True)
 config_yaml_path = os.path.join('lrkv/config/config.yaml')
 with open(config_yaml_path) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
-scaling = config['lsm_tree_config']['scaling']
-E = config['lsm_tree_config']['E'] / 8
-Q = int(config['lsm_tree_config']['Q'] / scaling)
-B = int(4000 / E)
-S = 2
-M = config['lsm_tree_config']['M'] / scaling
-N = config['lsm_tree_config']['N'] / scaling
 level_data = config['samples_path']['xgb_level_final']
 tier_data = config['samples_path']['xgb_tier_final']
-fold = 15   
+fold = 15
 for num_sample in [100]:
     start_time = time.time()
     all_samples = pd.read_csv(level_data)
@@ -54,6 +47,9 @@ for num_sample in [100]:
             sample['z1'],
             sample['q'],
             sample['w'],
+            sample['E'] / 8,
+            sample['M'] / sample['ratio'],
+            sample['N'],
         )
         Xc.append(xc)
         Yc.append(np.log(sample['cache_hit_rate'] + eps))
@@ -67,6 +63,9 @@ for num_sample in [100]:
                 sample['q'],
                 sample['w'],
                 sample['cache_hit_rate'] + eps,
+                sample['E'] / 8,
+                sample['M'] / sample['ratio'],
+                sample['N'],
             )
         )
         y = (sample['total_latency']) / sample['queries']
@@ -136,6 +135,11 @@ for num_sample in [100]:
             continue
         # if 'ratio' not in sample:
         #     sample['ratio'] = 1 - sample['cache_cap'] * 8 / M
+        # print(
+        #     sample['E'] / 8,
+        #     sample['M'] / sample['ratio'],
+        #     sample['N'],
+        # )
         xc = get_cache_uniform(
             sample['T'],
             sample['h'],
@@ -144,6 +148,9 @@ for num_sample in [100]:
             sample['z1'],
             sample['q'],
             sample['w'],
+            sample['E'] / 8,
+            sample['M'] / sample['ratio'],
+            sample['N'],
         )
         Xc.append(xc)
         Yc.append(np.log(sample['cache_hit_rate'] + eps))
@@ -157,6 +164,9 @@ for num_sample in [100]:
                 sample['q'],
                 sample['w'],
                 sample['cache_hit_rate'] + eps,
+                sample['E'] / 8,
+                sample['M'] / sample['ratio'],
+                sample['N'],
             )
         )
         y = (sample['total_latency']) / sample['queries']

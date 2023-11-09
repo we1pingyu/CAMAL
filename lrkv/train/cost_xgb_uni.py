@@ -21,13 +21,6 @@ np.set_printoptions(suppress=True)
 config_yaml_path = os.path.join('lrkv/config/config.yaml')
 with open(config_yaml_path) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
-scaling = config['lsm_tree_config']['scaling']
-E = config['lsm_tree_config']['E'] / 8
-Q = int(config['lsm_tree_config']['Q'] / scaling)
-B = int(4000 / E)
-S = 2
-M = config['lsm_tree_config']['M'] / scaling
-N = config['lsm_tree_config']['N'] / scaling
 level_data = config['samples_path']['xgb_level_final']
 tier_data = config['samples_path']['xgb_tier_final']
 fold = 15
@@ -60,9 +53,9 @@ for num_sample in [100]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
-                E,
-                M,
-                N,
+                sample['E'] / 8,
+                sample['M'] / sample['ratio'],
+                sample['N'],
             )
         )
         y = sample['total_latency'] / sample['queries']
@@ -119,9 +112,9 @@ for num_sample in [100]:
                 sample['z1'],
                 sample['q'],
                 sample['w'],
-                E,
-                M,
-                N,
+                sample['E'] / 8,
+                sample['M'] / sample['ratio'],
+                sample['N'],
             )
         )
         y = sample['total_latency'] / sample['queries']
@@ -139,7 +132,6 @@ for num_sample in [100]:
     for train_index, test_index in kf.split(X):
         X_train = X[train_index]
         Y_train = Y[train_index]
-        weights = 1 / Y_train
         regr = xgb.XGBRegressor()
 
         # Train the XGBoost cache model
@@ -147,6 +139,7 @@ for num_sample in [100]:
         X_test = X[test_index]
         Y_test = Y[test_index]
         y_hat = regr.predict(X_test)
+        # print(y_hat, Y_test)
         error = abs(y_hat - Y_test)
         rerror = abs(y_hat - Y_test) / Y_test
         for _y_hat, _y, _error, _rerror in zip(y_hat, Y_test, error, rerror):

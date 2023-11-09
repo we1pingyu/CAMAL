@@ -288,7 +288,7 @@ def T_level_equation(x, q, w):
 #     return abs((l * M - h * N) / np.exp(h) - (M - oh * N) / np.exp(oh))
 
 
-def h_mbuf_level_equation(x, z0, z1, w, q, T, E, M, N):
+def h_mbuf_level_equation(x, z0, z1, q, w, T, E, M, N):
     return abs(
         ((z0 + z1) * np.exp(-x / N)) / N
         - ((q + 2 * w * (T + 1) / B) / np.log(T) / (M - x))
@@ -328,7 +328,7 @@ def h_mbuf_tier_equation(x, z0, z1, w, q, T, E, M, N):
     )
 
 
-def T_tier_equation(x, z0, z1, q, w, E, M, N, h=10):
+def T_tier_equation(x, z0, z1, q, w, sel, E, M, N, h=10):
     # p0 = estimate_fpr(1)
     # p1 = estimate_fpr(10)
     # m0 = M / 8 / 2
@@ -343,7 +343,7 @@ def T_tier_equation(x, z0, z1, q, w, E, M, N, h=10):
     )
     return abs(
         (z0 + z1) * estimate_fpr(h)
-        + q * 0.5
+        + q * sel
         + l * (q * B * x * (np.log(x) - 1) - w) / (B * x * np.log(x))
     )
 
@@ -476,5 +476,5 @@ def T_tier_equation(x, z0, z1, q, w, E, M, N, h=10):
 #     return candidates[0]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass
