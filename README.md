@@ -8,10 +8,8 @@
 
 # Running CAMAL
 
-1. `python camal_xgb_level.py && python camal_xgb_tier.py` to collect training data.
+1. `python lrkv/data_collection/camal_xgb_level.py && python lrkv/data_collection/camal_xgb_tier.py` to collect training data.
 
 2. `python lrkv/train/cost_lr_uni.py && python lrkv/train/cost_xgb_uni.py` to train the models.
 
-3. `python optimizer_uniform_overall.py` to evaluate optimization.
-
-4. `python lrkv/data_collection/camal_xgb_level.py && python lrkv/data_collection/camal_xgb_tier.py && python lrkv/train/cost_lr_uni.py && python lrkv/train/cost_xgb_uni.py && python lrkv/optimizer/optimizer_uniform_overall.py`
+3. `python lrkv/optimizer/optimizer_uniform_overall.py` to evaluate optimization.
