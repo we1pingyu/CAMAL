@@ -8,7 +8,7 @@ import time
 import yaml
 import os
 
-sys.path.append('./lrkv')
+sys.path.append("./lrkv")
 from utils.lsm import estimate_level, estimate_fpr
 
 eps = 1e-5
@@ -20,19 +20,19 @@ def iter_model(df, policy, E, M, N):
     for sample in df:
         X.append(
             get_cost_uniform(
-                sample['T'],
-                sample['h'],
-                sample['ratio'],
-                sample['z0'],
-                sample['z1'],
-                sample['q'],
-                sample['w'],
+                sample["T"],
+                sample["h"],
+                sample["ratio"],
+                sample["z0"],
+                sample["z1"],
+                sample["q"],
+                sample["w"],
                 E,
                 M,
                 N,
             )
         )
-        Y.append(sample['total_latency'] / sample['queries'])
+        Y.append(sample["total_latency"] / sample["queries"])
     _X = np.array(X)
     _Y = np.array(Y)
     regr = xgb.XGBRegressor()
@@ -44,18 +44,18 @@ def prepare_df(samples, save_path):
     df = []
     for _, sample in samples.iterrows():
         row = {}
-        if sample['read_io'] + sample['write_io'] == 0:
+        if sample["read_io"] + sample["write_io"] == 0:
             continue
-        l = estimate_level(sample['N'], sample['mbuf'], sample['T'], get_ceiling=False)
-        fpr = np.exp(-1 * sample['h'] * (np.log(2) ** 2))
-        data = np.zeros([int(sample['N'])])
-        with open(sample['key_log'], 'r') as f:
+        l = estimate_level(sample["N"], sample["mbuf"], sample["T"], get_ceiling=False)
+        fpr = np.exp(-1 * sample["h"] * (np.log(2) ** 2))
+        data = np.zeros([int(sample["N"])])
+        with open(sample["key_log"], "r") as f:
             for line in f.readlines():
-                last = ord(line.strip('\n')[-1])
-                if last >= ord('A'):
-                    data[int(line.strip('\n')[:-1] + str(last - 65))] += 1
+                last = ord(line.strip("\n")[-1])
+                if last >= ord("A"):
+                    data[int(line.strip("\n")[:-1] + str(last - 65))] += 1
                 else:
-                    data[int(line.strip('\n'))] += 1
+                    data[int(line.strip("\n"))] += 1
         data = np.sort(np.squeeze(data[np.argwhere(data)]))[::-1]
         zipf_X = []
         zipf_Y = []
@@ -68,19 +68,19 @@ def prepare_df(samples, save_path):
         zipf_Y = np.array(zipf_Y)
         alpha, c = np.linalg.lstsq(zipf_X, zipf_Y, rcond=-1)[0]
         alpha = -alpha
-        row['alpha'] = alpha
-        row['c'] = c
-        row['z0'] = sample['z0']
-        row['z1'] = sample['z1']
-        row['q'] = sample['q']
-        row['w'] = sample['w']
-        row['T'] = sample['T']
-        row['l'] = l
-        row['fpr'] = fpr
-        row['cache_cap'] = sample['cache_cap']
-        row['mbuf'] = sample['mbuf']
-        row['cache_hit_rate'] = sample['cache_hit_rate']
-        row['total_latency'] = sample['total_latency']
+        row["alpha"] = alpha
+        row["c"] = c
+        row["z0"] = sample["z0"]
+        row["z1"] = sample["z1"]
+        row["q"] = sample["q"]
+        row["w"] = sample["w"]
+        row["T"] = sample["T"]
+        row["l"] = l
+        row["fpr"] = fpr
+        row["cache_cap"] = sample["cache_cap"]
+        row["mbuf"] = sample["mbuf"]
+        row["cache_hit_rate"] = sample["cache_hit_rate"]
+        row["total_latency"] = sample["total_latency"]
         df.append(row)
     pd.DataFrame(df).to_csv(save_path, index=False)
 
@@ -88,7 +88,7 @@ def prepare_df(samples, save_path):
 def load_models(model_path, folds):
     models = []
     for fold in range(folds):
-        model = pickle.load(open(model_path.replace('holder', str(fold)), 'rb'))
+        model = pickle.load(open(model_path.replace("holder", str(fold)), "rb"))
         models.append(model)
     return models
 
@@ -151,9 +151,9 @@ def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, E, M, N):
     costs = []
     xs = []
     settings = []
-    for T in range(2, 16):
-        for h in range(4, 11):
-            for ratio in [0.7, 0.8, 0.9, 1.0]:
+    for T in range(2, 100):
+        for h in range(2, 11):
+            for ratio in [0.9, 1.0]:
                 x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
                 settings.append((T, h, ratio, None))
                 xs.append(x)
@@ -224,7 +224,7 @@ def traverse_var_optimizer_uniform_memory(cost_models, policy, z0, z1, q, w, E, 
 
 def traverse_for_T(cost_models, z0, z1, q, w, E, M, N, h0=10, ratio0=1.0, n=10):
     candidates = []
-    for T in range(2, 16):
+    for T in range(2, 100):
         h = h0
         ratio = ratio0
         costs = []
@@ -242,7 +242,7 @@ def traverse_for_T(cost_models, z0, z1, q, w, E, M, N, h0=10, ratio0=1.0, n=10):
 
 def traverse_for_h(cost_models, z0, z1, q, w, E, M, N, T0=10, ratio0=1.0, n=10):
     candidates = []
-    for h in range(4, 11):
+    for h in range(2, 11):
         T = T0
         ratio = ratio0
         costs = []

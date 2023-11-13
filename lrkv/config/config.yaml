@@ -13,14 +13,14 @@ app:
 
 lsm_tree_config: 
     samples: 3
-    scaling: 10.0
-    M : 268435456
-    N: 10000000
+    scaling: 1.0
+    M : 10485760 
+    N: 1000000
     Q: 100000
     phi: 1
     s: 2       # Average range query selectivity
-    B: 32            # Number of entries that fit in a disk page
-    E: 1000         # Size of data entries in bits
+    # B: 32            # Number of entries that fit in a disk page
+    E: 8000         # Size of data entries in bits
 
 jobs:
     job_list:

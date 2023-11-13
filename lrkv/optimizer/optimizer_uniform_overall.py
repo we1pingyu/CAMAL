@@ -119,7 +119,7 @@ class Optimizer(object):
                 w,
             )
             nominal = NominalWorkloadTuning(cf)
-            nominal_design = nominal.get_nominal_design(is_leveling_policy=None)
+            nominal_design = nominal.get_nominal_design(is_leveling_policy=True)
             print(f"nominal_optimizer: {nominal_design}")
             row["T"] = int(nominal_design["T"])
             row["N"] = N
@@ -207,7 +207,7 @@ class Optimizer(object):
                 w,
             )
             nominal = NominalWorkloadTuning(cf)
-            nominal_design = nominal.get_nominal_design(is_leveling_policy=None)
+            nominal_design = nominal.get_nominal_design(is_leveling_policy=True)
             print(f"nominal_cache_optimizer: {nominal_design}")
             row["T"] = int(nominal_design["T"])
             row["N"] = N
@@ -278,7 +278,7 @@ class Optimizer(object):
             row["T"] = 10
             row["h"] = 10
             best_h = 10
-            row["cache_cap"] = 0.125 * M / 8
+            row["cache_cap"] = 0.125 * (M - best_h * N) / 8
             row["M"] = M - row["cache_cap"] * 8
             self.logger.info(f"Building DB at size : {N}")
             db = RocksDB(self.config)
@@ -340,7 +340,16 @@ class Optimizer(object):
                 best_var,
                 best_cost,
             ) = model_lr.traverse_var_optimizer_uniform(
-                level_cache_models, level_cost_models, z0, z1, q, w, "level", E, M, N
+                level_cache_models,
+                level_cost_models,
+                z0,
+                z1,
+                q,
+                w,
+                "level",
+                E,
+                M / 10 * scaling,
+                N / 10 * scaling,
             )
             row["is_leveling_policy"] = True
             (
@@ -350,7 +359,16 @@ class Optimizer(object):
                 tier_best_var,
                 tier_best_cost,
             ) = model_lr.traverse_var_optimizer_uniform(
-                tier_cache_models, tier_cost_models, z0, z1, q, w, "tier", E, M, N
+                tier_cache_models,
+                tier_cost_models,
+                z0,
+                z1,
+                q,
+                w,
+                "tier",
+                E,
+                M / 10 * scaling,
+                N / 10 * scaling,
             )
             print(
                 f"level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio},best_var: {best_var}, best_cost:{best_cost*Q}"
@@ -358,14 +376,14 @@ class Optimizer(object):
             print(
                 f"tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}"
             )
-            if tier_best_cost < best_cost:
-                row["is_leveling_policy"] = False
-                best_T, best_h, best_ratio, best_cost = (
-                    tier_best_T,
-                    tier_best_h,
-                    tier_best_ratio,
-                    tier_best_cost,
-                )
+            # if tier_best_cost < best_cost:
+            #     row["is_leveling_policy"] = False
+            #     best_T, best_h, best_ratio, best_cost = (
+            #         tier_best_T,
+            #         tier_best_h,
+            #         tier_best_ratio,
+            #         tier_best_cost,
+            #     )
             policy = row["is_leveling_policy"]
             print(
                 f"lr_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost*Q}"
@@ -429,7 +447,15 @@ class Optimizer(object):
                 best_var,
                 best_cost,
             ) = model_xgb.traverse_var_optimizer_uniform(
-                level_cost_models, 1, z0, z1, q, w, E, M, N
+                level_cost_models,
+                1,
+                z0,
+                z1,
+                q,
+                w,
+                E,
+                M / 10 * scaling,
+                N / 10 * scaling,
             )
             row["is_leveling_policy"] = True
             (
@@ -439,7 +465,15 @@ class Optimizer(object):
                 tier_best_var,
                 tier_best_cost,
             ) = model_xgb.traverse_var_optimizer_uniform(
-                tier_cost_models, 0, z0, z1, q, w, E, M, N
+                tier_cost_models,
+                0,
+                z0,
+                z1,
+                q,
+                w,
+                E,
+                M / 10 * scaling,
+                N / 10 * scaling,
             )
             print(
                 f"level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, best_var: {best_var}, best_cost:{best_cost*Q}"
@@ -447,14 +481,14 @@ class Optimizer(object):
             print(
                 f"tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}"
             )
-            if tier_best_cost < best_cost:
-                row["is_leveling_policy"] = False
-                best_T, best_h, best_ratio, best_cost = (
-                    tier_best_T,
-                    tier_best_h,
-                    tier_best_ratio,
-                    tier_best_cost,
-                )
+            # if tier_best_cost < best_cost:
+            #     row["is_leveling_policy"] = False
+            #     best_T, best_h, best_ratio, best_cost = (
+            #         tier_best_T,
+            #         tier_best_h,
+            #         tier_best_ratio,
+            #         tier_best_cost,
+            #     )
             policy = row["is_leveling_policy"]
             print(
                 f"xgb_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost*Q}"

@@ -328,13 +328,13 @@ def h_mbuf_tier_equation(x, z0, z1, w, q, T, E, M, N):
     )
 
 
-def T_tier_equation(x, z0, z1, q, w, sel, E, M, N, h=10):
+def T_tier_equation(x, z0, z1, q, w, sel, E, M, N, h0=10):
     # p0 = estimate_fpr(1)
     # p1 = estimate_fpr(10)
     # m0 = M / 8 / 2
     # m1 = M / 8
     # p = estimate_fpr(16)
-    mbuf = (M - N * h) / 8
+    mbuf = (M - N * h0) / 8
     l = estimate_level(
         N,
         mbuf,
@@ -342,7 +342,7 @@ def T_tier_equation(x, z0, z1, q, w, sel, E, M, N, h=10):
         E,
     )
     return abs(
-        (z0 + z1) * estimate_fpr(h)
+        (z0 + z1) * estimate_fpr(h0)
         + q * sel
         + l * (q * B * x * (np.log(x) - 1) - w) / (B * x * np.log(x))
     )

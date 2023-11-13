@@ -32,6 +32,7 @@ typedef struct environment
 
     size_t steps = 10;
     int sel = 2;
+    int scaling = 1;
     std::string compaction_style = "level";
     // Build mode
     double T = 10;
@@ -93,6 +94,7 @@ environment parse_args(int argc, char *argv[])
                                       (option("--dist") & value("mode", env.dist_mode)) % ("distribution mode ['uniform', 'zipf']"),
                                       (option("--skew") & number("num", env.skew)) % ("skewness for zipfian [0, 1)"),
                                       (option("--sel") & number("num", env.sel)) % ("selectivity of range query"),
+                                      (option("--scaling") & number("num", env.scaling)) % ("scaling"),
                                       (option("--cache").set(env.use_cache, true) & number("cap", env.cache_cap)) % "use block cache",
                                       (option("--key-log-file").set(env.use_key_log, true) & value("file", env.key_log_file)) % "use keylog to record each key"));
 
@@ -209,7 +211,7 @@ int main(int argc, char *argv[])
     rocksdb_opt.random_access_max_buffer_size = 0;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
     // rocksdb_opt.max_background_jobs = 1;
-    // rocksdb_opt.target_file_size_base = UINT64_MAX;
+    rocksdb_opt.target_file_size_base = 1 * 1048576;
     // rocksdb_opt.target_file_size_multiplier = env.T;
     tmpdb::Compactor *compactor = nullptr;
     tmpdb::CompactorOptions compactor_opt;
@@ -225,7 +227,7 @@ int main(int argc, char *argv[])
         compactor_opt.entry_size = env.E;
         compactor_opt.bits_per_element = env.bits_per_element;
         compactor_opt.num_entries = env.N;
-        compactor_opt.levels = tmpdb::Compactor::estimate_levels(env.N, env.T, env.E, env.B) + 1;
+        compactor_opt.levels = tmpdb::Compactor::estimate_levels(env.N, env.T, env.E, env.B) + 2;
         rocksdb_opt.num_levels = compactor_opt.levels + 1;
         compactor = new tmpdb::Compactor(compactor_opt, rocksdb_opt);
         rocksdb_opt.listeners.emplace_back(compactor);
@@ -346,11 +348,11 @@ int main(int argc, char *argv[])
         while (compactor->compactions_left_count > 0)
             ;
     }
-    // while (compactor->requires_compaction(db))
-    // {
-    //     while (compactor->compactions_left_count > 0)
-    //         ;
-    // }
+    while (compactor->requires_compaction(db))
+    {
+        while (compactor->compactions_left_count > 0)
+            ;
+    }
     // }
     auto write_time_end = std::chrono::high_resolution_clock::now();
     auto write_time = std::chrono::duration_cast<std::chrono::milliseconds>(write_time_end - write_time_start).count();
@@ -418,7 +420,7 @@ int main(int argc, char *argv[])
         {
             key = data_gen->gen_existing_key();
             key_log->log_key(key);
-            limit = std::to_string(stoi(key) + env.sel);
+            limit = std::to_string(stoi(key) + 1 + env.sel);
             for (it->Seek(rocksdb::Slice(key)); it->Valid() && it->key().ToString() < limit; it->Next())
             {
                 value = it->value().ToString();
@@ -427,9 +429,9 @@ int main(int argc, char *argv[])
         }
         case 3:
         {
-            key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
-            key_log->log_key(key_value.first);
-            db->Put(write_opt, key_value.first, key_value.second);
+            // key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
+            // key_log->log_key(key_value.first);
+            // db->Put(write_opt, key_value.first, key_value.second);
             break;
         }
         default:
@@ -438,7 +440,7 @@ int main(int argc, char *argv[])
     }
     delete it;
     // spdlog::info("Flushing DB...");
-    db->Flush(flush_opt);
+    // db->Flush(flush_opt);
     spdlog::info("Waiting for all remaining background compactions to finish");
     // if (env.compaction_style == "level")
     // {
@@ -470,15 +472,15 @@ int main(int argc, char *argv[])
         while (compactor->compactions_left_count > 0)
             ;
     }
-    // while (compactor->requires_compaction(db))
-    // {
-    //     while (compactor->compactions_left_count > 0)
-    //         ;
-    // }
+    while (compactor->requires_compaction(db))
+    {
+        while (compactor->compactions_left_count > 0)
+            ;
+    }
     // }
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
-
+    latency += write_time * env.writes * env.steps / env.N;
     db->GetColumnFamilyMetaData(&cf_meta);
     run_per_level = "[";
     for (auto &level : cf_meta.levels)

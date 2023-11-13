@@ -124,7 +124,7 @@ class LevelCost(object):
             row["N"],
             row["phi"],
             row["s"] / row["N"],
-            row["B"],
+            int(4000 * 8 / row["E"]),
             row["E"],
             row["M"],
             row["is_leveling_policy"],
@@ -167,16 +167,16 @@ class LevelCost(object):
         right_offset = h - left_offset - 1
         for i in range(-left_offset, right_offset + 1):
             value = x0 + i
-            if lower_bound <= value <= upper_bound:
+            if lower_bound <= value < upper_bound:
                 samples.append(value)
         while len(samples) < h and (upper_bound - lower_bound + 1) >= h:
             right_offset += 1
             value = x0 + right_offset
-            if lower_bound <= value <= upper_bound:
+            if lower_bound <= value < upper_bound:
                 samples.append(value)
             left_offset += 1
             value = x0 - left_offset
-            if lower_bound <= value <= upper_bound:
+            if lower_bound <= value < upper_bound:
                 samples.append(value)
         return samples
 
@@ -192,16 +192,16 @@ class LevelCost(object):
             # Train and search optimal size ratio
             min_err = 1e9
             # for T in range(2, estimate_T(N, M / 2 / 8, 1, E) + 1):
-            for T in range(2, 16):
+            for T in range(2, 100):
                 err = T_level_equation(T, q, w)
                 if err < min_err:
                     min_err = err
                     temp = T
             if df == []:
-                T_list = self.sample_around_x0(temp, self.samples, 8, 11)
+                T_list = self.sample_around_x0(temp, self.samples, 2, 100)
             else:
                 regr = iter_model(df, "level", E, M, N)
-                t = traverse_for_T([regr], z0, z1, q, w, E, M, N, n=-1)
+                t = traverse_for_T([regr], z0, z1, q, w, E, M, N, h0=8, n=-1)
                 T_list = [temp]
                 T_list = weight_sampling(t, 0, self.samples, T_list)
             print(T_list)
@@ -209,7 +209,7 @@ class LevelCost(object):
             ratio = 1.0
             dist = "uniform"
             skew = 0.0
-            bpe = 10
+            bpe = 8
             buffer = ratio * (M - bpe * N)
             cache_cap = (1 - ratio) * M / 8
             for size_ratio in T_list:
@@ -239,14 +239,14 @@ class LevelCost(object):
             T0 = candidates[0][0]
 
             min_err = 1e9
-            for h in range(4, 11):
+            for h in range(2, 11):
                 err = h_mbuf_level_equation(h, z0, z1, q, w, T0, E, M, N)
                 if err < min_err:
                     min_err = err
                     temp = h
             h_list = []
             if False:
-                h_list = self.sample_around_x0(temp, self.samples, 4, 11)
+                h_list = self.sample_around_x0(temp, self.samples, 2, 11)
             else:
                 regr = iter_model(df, "level", E, M, N)
                 h = traverse_for_h([regr], z0, z1, q, w, E, M, N, T0=T0, n=-1)
@@ -280,7 +280,7 @@ class LevelCost(object):
             h0 = candidates[0][1]
 
             min_err = 1e9
-            for ratio in [0.7, 0.8, 0.9]:
+            for ratio in [0.9]:
                 buffer = ratio * (M - h0 * N)
                 cache_cap = (1 - ratio) * M / 8
                 size_ratio = T0

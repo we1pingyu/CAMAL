@@ -168,16 +168,16 @@ class LevelCost(object):
         right_offset = h - left_offset - 1
         for i in range(-left_offset, right_offset + 1):
             value = x0 + i
-            if lower_bound <= value <= upper_bound:
+            if lower_bound <= value < upper_bound:
                 samples.append(value)
         while len(samples) < h and (upper_bound - lower_bound + 1) >= h:
             right_offset += 1
             value = x0 + right_offset
-            if lower_bound <= value <= upper_bound:
+            if lower_bound <= value < upper_bound:
                 samples.append(value)
             left_offset += 1
             value = x0 - left_offset
-            if lower_bound <= value <= upper_bound:
+            if lower_bound <= value < upper_bound:
                 samples.append(value)
         return samples
 
@@ -194,7 +194,7 @@ class LevelCost(object):
             min_err = 1e9
             # for T in range(2, estimate_T(N, M / 2 / 8, 1, E) + 1):
             for T in range(2, 16):
-                err = T_tier_equation(T, z0, z1, q, w, sel, E, M, N)
+                err = T_tier_equation(T, z0, z1, q, w, sel, E, M, N, h0=8)
                 if err < min_err:
                     min_err = err
                     temp = T
@@ -210,7 +210,7 @@ class LevelCost(object):
             ratio = 1.0
             dist = "uniform"
             skew = 0.0
-            bpe = 10
+            bpe = 8
             buffer = ratio * (M - bpe * N)
             cache_cap = (1 - ratio) * M / 8
             for size_ratio in T_list:
@@ -247,7 +247,7 @@ class LevelCost(object):
                     temp = h
             h_list = []
             if False:
-                h_list = self.sample_around_x0(temp, self.samples, 2, 15)
+                h_list = self.sample_around_x0(temp, self.samples, 4, 11)
             else:
                 regr = iter_model(df, "tier", E, M, N)
                 h = traverse_for_h([regr], z0, z1, q, w, E, M, N, T0=T0, n=-1)

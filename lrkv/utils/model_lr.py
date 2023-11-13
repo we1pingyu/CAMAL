@@ -339,9 +339,9 @@ def traverse_var_optimizer(
 def traverse_var_optimizer_uniform(Wcs, Ws, z0, z1, q, w, policy, E, M, N):
     start_time = time.time()
     candidates = []
-    for T in range(2, 16):
-        for h in range(4, 11):
-            for ratio in [0.7, 0.8, 0.9, 1.0]:
+    for T in range(2, 100):
+        for h in range(2, 11):
+            for ratio in [0.9, 1.0]:
                 costs = []
                 for Wc, W in zip(Wcs, Ws):
                     xc = get_cache_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
