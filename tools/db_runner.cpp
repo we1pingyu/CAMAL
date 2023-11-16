@@ -204,14 +204,14 @@ int main(int argc, char *argv[])
     // rocksdb_opt.IncreaseParallelism(env.parallelism);
     rocksdb_opt.compression = rocksdb::kNoCompression;
     rocksdb_opt.bottommost_compression = kNoCompression;
-    rocksdb_opt.use_direct_reads = true;
-    rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
+    // rocksdb_opt.use_direct_reads = true;
+    // rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.advise_random_on_open = false;
     rocksdb_opt.random_access_max_buffer_size = 0;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
     // rocksdb_opt.max_background_jobs = 1;
-    rocksdb_opt.target_file_size_base = 1 * 1048576;
+    rocksdb_opt.target_file_size_base = env.scaling * 1048576;
     // rocksdb_opt.target_file_size_multiplier = env.T;
     tmpdb::Compactor *compactor = nullptr;
     tmpdb::CompactorOptions compactor_opt;
@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
     {
         rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
         rocksdb_opt.disable_auto_compactions = true;
-        rocksdb_opt.write_buffer_size = env.B;
+        rocksdb_opt.write_buffer_size = env.B / 2;
         compactor_opt.tiered_policy = false;
         compactor_opt.size_ratio = env.T;
         compactor_opt.buffer_size = env.B;
@@ -236,7 +236,7 @@ int main(int argc, char *argv[])
     {
         rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
         rocksdb_opt.disable_auto_compactions = true;
-        rocksdb_opt.write_buffer_size = env.B;
+        rocksdb_opt.write_buffer_size = env.B / 2;
         compactor_opt.size_ratio = env.T;
         compactor_opt.buffer_size = env.B;
         compactor_opt.entry_size = env.E;

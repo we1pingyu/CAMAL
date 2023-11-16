@@ -73,7 +73,7 @@ for num_sample in [100]:
         X_train = X[train_index]
         Y_train = Y[train_index]
         weights = 1 / Y_train
-        regr = xgb.XGBRegressor()
+        regr = xgb.XGBRegressor(learning_rate=0.5, n_estimators=10)
         # Train the XGBoost cache model
         regr.fit(X_train, Y_train)
         X_test = X[test_index]
@@ -133,7 +133,7 @@ for num_sample in [100]:
     for train_index, test_index in kf.split(X):
         X_train = X[train_index]
         Y_train = Y[train_index]
-        regr = xgb.XGBRegressor()
+        regr = xgb.XGBRegressor(learning_rate=0.5, n_estimators=10)
 
         # Train the XGBoost cache model
         regr.fit(X_train, Y_train)

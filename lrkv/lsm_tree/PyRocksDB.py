@@ -106,6 +106,7 @@ class RocksDB(object):
         is_leveling_policy=True,
         cache_cap=0,
         key_log="",
+        scaling=1,
     ):
         """
         Runs a set of queries on the database
@@ -141,6 +142,7 @@ class RocksDB(object):
             f"-s {steps}",
             f"-c {self.compaction_style}",
             f"--sel {sel}",
+            f"--scaling {scaling}",
             f"--parallelism {THREADS}",
             f"--dist {dist}",
             f"--skew {skew}",

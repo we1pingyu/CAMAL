@@ -23,12 +23,13 @@ config_yaml_path = os.path.join("lrkv/config/config.yaml")
 with open(config_yaml_path) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 scaling = config["lsm_tree_config"]["scaling"]
+scaling = 10
 E = config["lsm_tree_config"]["E"] / 8
-Q = int(config["lsm_tree_config"]["Q"] / scaling)
+Q = int(config["lsm_tree_config"]["Q"] * scaling)
 B = int(4000 / E)
 S = 2
-M = config["lsm_tree_config"]["M"] / scaling
-N = config["lsm_tree_config"]["N"] / scaling
+M = config["lsm_tree_config"]["M"] * scaling
+N = config["lsm_tree_config"]["N"] * scaling
 sel = config["lsm_tree_config"]["s"]
 workloads = [
     (0.25, 0.25, 0.25, 0.25),
@@ -162,6 +163,7 @@ class Optimizer(object):
                 is_leveling_policy=row["is_leveling_policy"],
                 cache_cap=0,
                 key_log=key_log,
+                scaling=scaling,
             )
             for key, val in results.items():
                 self.logger.info(f"{key} : {val}")
@@ -248,6 +250,7 @@ class Optimizer(object):
                 is_leveling_policy=row["is_leveling_policy"],
                 cache_cap=row["cache_cap"],
                 key_log=key_log,
+                scaling=scaling,
             )
             for key, val in results.items():
                 self.logger.info(f"{key} : {val}")
@@ -301,6 +304,7 @@ class Optimizer(object):
                 is_leveling_policy=row["is_leveling_policy"],
                 cache_cap=row["cache_cap"],
                 key_log=key_log,
+                scaling=scaling,
             )
             for key, val in results.items():
                 self.logger.info(f"{key} : {val}")
@@ -348,8 +352,8 @@ class Optimizer(object):
                 w,
                 "level",
                 E,
-                M / 10 * scaling,
-                N / 10 * scaling,
+                M / scaling,
+                N / scaling,
             )
             row["is_leveling_policy"] = True
             (
@@ -367,8 +371,8 @@ class Optimizer(object):
                 w,
                 "tier",
                 E,
-                M / 10 * scaling,
-                N / 10 * scaling,
+                M / scaling,
+                N / scaling,
             )
             print(
                 f"level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio},best_var: {best_var}, best_cost:{best_cost*Q}"
@@ -414,6 +418,7 @@ class Optimizer(object):
                 is_leveling_policy=row["is_leveling_policy"],
                 cache_cap=row["cache_cap"],
                 key_log=key_log,
+                scaling=scaling,
             )
             for key, val in results.items():
                 self.logger.info(f"{key} : {val}")
@@ -454,8 +459,8 @@ class Optimizer(object):
                 q,
                 w,
                 E,
-                M / 10 * scaling,
-                N / 10 * scaling,
+                M / scaling,
+                N / scaling,
             )
             row["is_leveling_policy"] = True
             (
@@ -472,8 +477,8 @@ class Optimizer(object):
                 q,
                 w,
                 E,
-                M / 10 * scaling,
-                N / 10 * scaling,
+                M / scaling,
+                N / scaling,
             )
             print(
                 f"level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, best_var: {best_var}, best_cost:{best_cost*Q}"
@@ -519,6 +524,7 @@ class Optimizer(object):
                 is_leveling_policy=row["is_leveling_policy"],
                 cache_cap=row["cache_cap"],
                 key_log=key_log,
+                scaling=scaling,
             )
             for key, val in results.items():
                 self.logger.info(f"{key} : {val}")
@@ -540,6 +546,13 @@ class Optimizer(object):
             print("rocksdb_t: ", np.mean(rocksdb_t))
             print("lr_t: ", np.mean(lr_t))
             print("xgb_t: ", np.mean(xgb_t))
+            _a = []
+            _b = []
+            for a, b, c, d, e in zip(non_t, non_cache_t, rocksdb_t, lr_t, xgb_t):
+                _a.append(e / a)
+                _b.append(e / b)
+            print("xgb/non: ", np.mean(_a))
+            print("xgb/rocksdb: ", np.mean(_b))
         self.logger.info("Exporting data from lr optimizer")
         pd.DataFrame(df).to_csv(self.config["optimizer_path"]["final"])
         self.logger.info("Finished optimizer\n")

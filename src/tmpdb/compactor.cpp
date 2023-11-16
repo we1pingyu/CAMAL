@@ -260,7 +260,7 @@ CompactionTask *Compactor::PickLevelCompaction(rocksdb::DB *db, const std::strin
 
     if (level_idx == 0)
     {
-        if (input_file_names.size() >= 4)
+        if (input_file_names.size() >= 1)
         {
             // pick targer output level
             int target_lvl = 1;

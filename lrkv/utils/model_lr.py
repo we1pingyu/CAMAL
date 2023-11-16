@@ -39,6 +39,9 @@ def iter_model(df, policy, E, M, N):
             sample["z1"],
             sample["q"],
             sample["w"],
+            E,
+            M,
+            N,
         )
         Xc.append(xc)
         Yc.append(np.log(sample["cache_hit_rate"] + eps))
@@ -85,20 +88,20 @@ def iter_model(df, policy, E, M, N):
 
 
 def traverse_for_T(
-    Ws, Wcs, z0, z1, q, w, h0=10, ratio0=1.0, N=1e6, n=10, policy="level"
+    Ws, Wcs, z0, z1, q, w, E, M, N, h0=10, ratio0=1.0, n=10, policy="level"
 ):
     candidates = []
-    for T in range(2, 78):
+    for T in range(2, 100):
         h = h0
         ratio = ratio0
         costs = []
         for W, Wc in zip(Ws, Wcs):
-            xc = get_cache_uniform(T, h0, ratio, z0, z1, q, w)
+            xc = get_cache_uniform(T, h0, ratio, z0, z1, q, w, E, M, N)
             yc = np.clip(np.exp(np.dot(xc, Wc)), 0, 1)
             if policy == "level":
-                x = get_level_cost(T, h0, ratio, z0, z1, q, w, yc)
+                x = get_level_cost(T, h0, ratio, z0, z1, q, w, yc, E, M, N)
             else:
-                x = get_tier_cost(T, h0, ratio, z0, z1, q, w, yc)
+                x = get_tier_cost(T, h0, ratio, z0, z1, q, w, yc, E, M, N)
             y = np.dot(x, W)
             costs.append(max(y, eps))
         candidates.append([T, h, ratio, np.var(costs), np.mean(costs)])
@@ -109,20 +112,20 @@ def traverse_for_T(
 
 
 def traverse_for_h(
-    Ws, Wcs, z0, z1, q, w, T0=10, ratio0=1.0, N=1e6, n=10, policy="level"
+    Ws, Wcs, z0, z1, q, w,  E, M, N,T0=10, ratio0=1.0, n=10, policy="level"
 ):
     candidates = []
-    for h in range(1, 16):
+    for h in range(2, 11):
         T = T0
         ratio = ratio0
         costs = []
         for W, Wc in zip(Ws, Wcs):
-            xc = get_cache_uniform(T, h, ratio, z0, z1, q, w)
+            xc = get_cache_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
             yc = np.clip(np.exp(np.dot(xc, Wc)), 0, 1)
             if policy == "level":
                 x = get_level_cost(T, h, ratio, z0, z1, q, w, yc, E, M, N)
             else:
-                x = get_tier_cost(T, h, ratio, z0, z1, q, w, yc)
+                x = get_tier_cost(T, h, ratio, z0, z1, q, w, yc, E, M, N)
             y = np.dot(x, W)
             y = np.dot(x, W)
             costs.append(max(y, eps))

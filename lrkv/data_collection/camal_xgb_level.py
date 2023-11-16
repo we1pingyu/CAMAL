@@ -40,11 +40,10 @@ with open(config_yaml_path) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 scaling = config["lsm_tree_config"]["scaling"]
 E = config["lsm_tree_config"]["E"] / 8
-Q = int(config["lsm_tree_config"]["Q"] / scaling)
+Q = int(config["lsm_tree_config"]["Q"] * scaling)
 B = int(4000 / E)
-S = 2
-M = config["lsm_tree_config"]["M"] / scaling
-N = config["lsm_tree_config"]["N"] / scaling
+M = config["lsm_tree_config"]["M"] * scaling
+N = config["lsm_tree_config"]["N"] * scaling
 sel = config["lsm_tree_config"]["s"]
 level_data = config["samples_path"]["xgb_level_final"]
 tier_data = config["samples_path"]["xgb_tier_final"]
