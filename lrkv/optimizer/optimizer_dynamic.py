@@ -27,7 +27,7 @@ with open(config_yaml_path) as f:
 scaling = config["lsm_tree_config"]["scaling"]
 scaling = 10
 E = config["lsm_tree_config"]["E"] / 8
-Q = int(config["lsm_tree_config"]["Q"])
+Q = int(config["lsm_tree_config"]["Q"] * scaling)
 B = int(4000 / E)
 S = 2
 M = int(config["lsm_tree_config"]["M"] * scaling)
@@ -43,6 +43,10 @@ workloads = [
     (0.05, 0.05, 0.15, 0.75),
 ]
 
+optimal_params_filename = "optimal_params.in"
+if os.path.exists(optimal_params_filename):
+    os.remove(optimal_params_filename)
+
 dists = ["uniform"]
 
 class Optimizer(object):
@@ -53,57 +57,34 @@ class Optimizer(object):
         self.latency_per_workload_prog = re.compile(
             r"\[[0-9:.]+\]\[info\] latency_per_workload : " r"(\[[0-9,\s]+\])"
         )
+        self.level_cost_models = pkl.load(
+            open(self.config["xgb_model"]["level_xgb_cost_model"], "rb")
+        )
 
-    def get_optimal_param(self):
-        test_cases = []
-        for workload in workloads:
-            dist = "uniform"
-            skew = 0.0
-            row = self.config["lsm_tree_config"].copy()
-            row["db_name"] = "level_optimizer"
-            row["path_db"] = self.config["app"]["DATABASE_PATH"]
-            z0, z1, q, w = workload
-            row["N"] = N
-            row["queries"] = Q
-            row["dist"] = dist
-            row["skew"] = skew
-            row["z0"] = z0
-            row["z1"] = z1
-            row["q"] = q
-            row["w"] = w
+    def get_optimal_param(self, workload):
+        optimal_params_file = open(optimal_params_filename, "a")
+        z0, z1, q, w = workload
+        (
+            best_T,
+            best_h,
+            best_ratio,
+            best_var,
+            best_cost,
+        ) = model_xgb.traverse_var_optimizer_uniform(
+            self.level_cost_models,
+            1,
+            z0,
+            z1,
+            q,
+            w,
+            E,
+            M / scaling,
+            N / scaling,
+        )
 
-            # learned xgb optimizer
-            row = copy.deepcopy(row)
-            row["optimizer"] = "xgb"
-            level_cost_models = pkl.load(
-                open(self.config["xgb_model"]["level_xgb_cost_model"], "rb")
-            )
-            (
-                best_T,
-                best_h,
-                best_ratio,
-                best_var,
-                best_cost,
-            ) = model_xgb.traverse_var_optimizer_uniform(
-                level_cost_models,
-                1,
-                z0,
-                z1,
-                q,
-                w,
-                E,
-                M / scaling,
-                N / scaling,
-            )
-            test_cases.append([z0, z1, q, w, best_T, best_h, best_ratio])
+        optimal_params_file.write(f"{z0} {z1} {q} {w} {best_T} {best_h} {best_ratio}\n")
+        return [z0, z1, q, w, best_T, best_h, best_ratio]
 
-        return test_cases
-    
-    def gen_test_workloads(self, cases):
-        workloads_file = open("workloads.in", "w")
-        for case in cases:
-            z0, z1, q, w, best_T, best_h, best_ratio = case
-            workloads_file.write(f"{z0} {z1} {q} {w} {best_T} {best_h} {best_ratio}\n")
 
     def start_db_runner(self, tuning_T, tuning_h, default_config):
         cmd = [
@@ -149,7 +130,9 @@ class Optimizer(object):
             return results
         try:
             latency_per_workload = self.latency_per_workload_prog.findall(proc_results)[0]
-            results = latency_per_workload.strip()
+            latency_per_workload = latency_per_workload.strip()
+            results = latency_per_workload.strip('][').split(', ')
+            results = [int(r) for r in results]
             return results
         except:
             self.logger.warn("Log errors")
@@ -158,8 +141,10 @@ class Optimizer(object):
 
 
     def run(self):
-        cases = self.get_optimal_param()
-        self.gen_test_workloads(cases)
+        cases = []
+        for workload in workloads:
+            case = self.get_optimal_param(workload)
+            cases.append(case)
 
         latency_ht = self.start_db_runner(tuning_T=True, tuning_h=True, default_config=False)
         latency_t = self.start_db_runner(tuning_T=True, tuning_h=False, default_config=False)
