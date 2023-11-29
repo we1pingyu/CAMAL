@@ -205,6 +205,8 @@ namespace tmpdb
          * @param L number of levels
          */
         static size_t calculate_full_tree(double T, size_t E, size_t B, size_t L);
+        void updateT(int T);
+        void updateM(size_t M);
     };
 
 } /* namespace tmpdb */

@@ -496,3 +496,19 @@ size_t Compactor::calculate_full_tree(double T, size_t E, size_t B, size_t L)
 
     return full_tree_size;
 }
+
+void Compactor::updateT(int T)
+{
+    this->meta_data_mutex.lock();
+    this->compactor_opt.size_ratio = T;
+    this->meta_data_mutex.unlock();
+    return;
+}
+
+void Compactor::updateM(size_t M)
+{
+    this->meta_data_mutex.lock();
+    this->compactor_opt.buffer_size = M;
+    this->meta_data_mutex.unlock();
+    return;
+}

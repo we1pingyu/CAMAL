@@ -220,6 +220,8 @@ class FilterPolicy {
       const Slice& /*contents*/) const {
     return nullptr;
   }
+
+  virtual void Update_bpe(double) {}
 };
 
 class MonkeyFilterPolicy : public FilterPolicy
@@ -232,7 +234,7 @@ public:
     std::vector<double> level_fpr_opt;
     std::vector<double> level_bpe;
 
-    const std::unique_ptr<const FilterPolicy> default_policy;
+    std::unique_ptr<const FilterPolicy> default_policy;
     std::vector<const FilterPolicy *> policy_per_level;
 
     MonkeyFilterPolicy(double _bits_per_element, int _size_ratio, size_t _levels);
@@ -253,9 +255,11 @@ public:
 
     double optimal_false_positive_rate(size_t curr_level);
     void allocate_bits_per_level();
+    
+    void Update_bpe(double _bits_per_element) override;
 };
 
-const FilterPolicy* NewMonkeyFilterPolicy(double bits_per_key,
+FilterPolicy* NewMonkeyFilterPolicy(double bits_per_key,
                                           int size_ratio,
                                           size_t levels);
 

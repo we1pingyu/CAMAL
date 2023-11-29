@@ -1371,7 +1371,7 @@ const FilterPolicy* NewBloomFilterPolicy(double bits_per_key,
 }
 
 
-const FilterPolicy* NewMonkeyFilterPolicy(
+FilterPolicy* NewMonkeyFilterPolicy(
   double bits_per_key,
   int size_ratio,
   size_t levels)
@@ -1444,6 +1444,12 @@ MonkeyFilterPolicy::MonkeyFilterPolicy(double _bits_per_element, int _size_ratio
   this->allocate_bits_per_level();
 }
 
+void MonkeyFilterPolicy::Update_bpe(double _bits_per_element)
+{
+  this->default_bpe = _bits_per_element;
+  this->default_policy.reset(NewBloomFilterPolicy(_bits_per_element));
+  this->allocate_bits_per_level();
+}
 
 MonkeyFilterPolicy::~MonkeyFilterPolicy() {}
 

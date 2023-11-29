@@ -140,6 +140,9 @@ target_link_libraries(tools PUBLIC tmpdb)
 add_executable(db_runner ${CMAKE_SOURCE_DIR}/tools/db_runner.cpp)
 target_link_libraries(db_runner tmpdb tools)
 
+add_executable(db_runner_dynamic ${CMAKE_SOURCE_DIR}/tools/db_runner_dynamic.cpp)
+target_link_libraries(db_runner_dynamic tmpdb tools)
+
 # add_executable(sim_runner ${CMAKE_SOURCE_DIR}/tools/sim_runner.cpp)
 # target_link_libraries(sim_runner tmpdb tools)
 
