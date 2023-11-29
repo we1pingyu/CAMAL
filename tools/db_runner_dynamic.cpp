@@ -188,7 +188,7 @@ int main(int argc, char *argv[])
     std::vector<double>best_h;
     std::vector<double>best_ratio;
 
-    auto fworkloads = freopen("workloads.txt", "r", stdin);
+    auto fworkloads = freopen("workloads.in", "r", stdin);
     if (fworkloads == nullptr)
         return 0;
 

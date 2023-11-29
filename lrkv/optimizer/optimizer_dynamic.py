@@ -100,7 +100,7 @@ class Optimizer(object):
         return test_cases
     
     def gen_test_workloads(self, cases):
-        workloads_file = open("workloads.txt", "w")
+        workloads_file = open("workloads.in", "w")
         for case in cases:
             z0, z1, q, w, best_T, best_h, best_ratio = case
             workloads_file.write(f"{z0} {z1} {q} {w} {best_T} {best_h} {best_ratio}\n")
@@ -128,6 +128,7 @@ class Optimizer(object):
         if default_config:
             cmd.append("--default-config")
         cmd = " ".join(cmd)
+        self.db_id += 1
         self.logger.debug(f"{cmd}")
         self.logger.info(f"{cmd}")
         proc = subprocess.Popen(
@@ -161,13 +162,31 @@ class Optimizer(object):
         self.gen_test_workloads(cases)
 
         latency_ht = self.start_db_runner(tuning_T=True, tuning_h=True, default_config=False)
-        print("latency_ht: ", latency_ht)
         latency_t = self.start_db_runner(tuning_T=True, tuning_h=False, default_config=False)
-        print("latency_t: ", latency_t)
         latency_h = self.start_db_runner(tuning_T=False, tuning_h=True, default_config=False)
-        print("latency_h: ", latency_h)
         latency_default = self.start_db_runner(tuning_T=False, tuning_h=False, default_config=True)
+
+        print("latency_ht: ", latency_ht)
+        print("latency_t: ", latency_t)
+        print("latency_h: ", latency_h)
         print("latency_default: ", latency_default)
+
+        df = []
+        for i in range(len(cases) - 1):
+            row = {}
+            row["source_z0"], row["source_z1"], row["source_q"], row["source_w"] = cases[i][: 4]
+            row["target_z0"], row["target_z1"], row["target_q"], row["target_w"] = cases[i + 1][: 4]
+            row["N"] = N
+            row["M"] = M
+            row["s"] = Q
+            row["T"], row["h"], row["ratio"] = cases[i + 1][4: ]
+            row["latency_tuning_ht"] = latency_ht[i]
+            row["latency_tuning_T"] = latency_t[i]
+            row["latency_tuning_h"] = latency_h[i]
+            row["latency_rocksdb"] = latency_default[i]
+            df.append(row)
+
+        pd.DataFrame(df).to_csv("optimizer_data/dynamic_tuning_results.csv")
 
 if __name__ == "__main__":
     # Load configuration
