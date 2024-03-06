@@ -183,20 +183,22 @@ int main(int argc, char *argv[])
     spdlog::set_pattern("[%T.%e]%^[%l]%$ %v");
     environment env = parse_args(argc, argv);
 
-    std::vector<std::vector<double> >workloads;
-    std::vector<double>best_T;
-    std::vector<double>best_h;
-    std::vector<double>best_ratio;
+    std::vector<std::vector<double>> workloads;
+    std::vector<double> best_T;
+    std::vector<double> best_h;
+    std::vector<double> best_ratio;
 
     auto fworkloads = freopen("optimal_params.in", "r", stdin);
     if (fworkloads == nullptr)
         return 0;
 
     double z0, z1, q, w, T, h, ratio;
-    while(~scanf("%lf %lf %lf %lf %lf %lf %lf\n", &z0, &z1, &q, &w, &T, &h, &ratio)) {
+    while (~scanf("%lf %lf %lf %lf %lf %lf %lf\n", &z0, &z1, &q, &w, &T, &h, &ratio))
+    {
         workloads.push_back({z0, z1, q, w});
         best_T.push_back(T);
         best_h.push_back(h);
+        spdlog::info("best T: {}, best h: {}", T, h);
         best_ratio.push_back(ratio);
     }
 
@@ -222,11 +224,13 @@ int main(int argc, char *argv[])
     }
 
     size_t M = env.M;
-    if (env.rocksdb_default_config) {
+    if (env.rocksdb_default_config)
+    {
         env.T = 10.0;
         env.bits_per_element = 10.0;
     }
-    else {
+    else
+    {
         env.T = best_T[0];
         env.bits_per_element = best_h[0];
     }
@@ -288,7 +292,7 @@ int main(int argc, char *argv[])
     }
 
     rocksdb::BlockBasedTableOptions table_options;
-    rocksdb::FilterPolicy* filter_policy = 
+    rocksdb::FilterPolicy *filter_policy =
         rocksdb::NewMonkeyFilterPolicy(
             env.bits_per_element,
             rocksdb_opt.max_bytes_for_level_multiplier,
@@ -381,23 +385,26 @@ int main(int argc, char *argv[])
     data_gen = new YCSBGenerator(env.N, env.dist_mode, env.skew);
     rocksdb::Iterator *it = db->NewIterator(rocksdb::ReadOptions());
     env.sel = 4000 * env.sel / env.E;
-    
+
     size_t cur_N = env.N; // current number of entries
     size_t num_workloads = workloads.size();
     std::vector<int64_t> latency;
     bool tuning = (env.tuning_T || env.tuning_h);
 
-    for (size_t k = 0; k < num_workloads - 1; ++k) 
+    for (size_t k = 0; k < num_workloads - 1; ++k)
     {
-        if (tuning) {
+        if (tuning)
+        {
             auto time_start = std::chrono::high_resolution_clock::now();
-            if (env.tuning_T && env.T != best_T[k + 1]) {
+            if (env.tuning_T && env.T != best_T[k + 1])
+            {
                 spdlog::info("update T: from {} to {}", env.T, best_T[k + 1]);
                 env.T = best_T[k + 1];
                 compactor->updateT(env.T);
             }
 
-            if (env.tuning_h && env.bits_per_element != best_h[k + 1]) {
+            if (env.tuning_h && env.bits_per_element != best_h[k + 1])
+            {
                 spdlog::info("update h: from {} to {}", env.bits_per_element, best_h[k + 1]);
                 env.bits_per_element = best_h[k + 1];
                 filter_policy->Update_bpe(env.bits_per_element);
@@ -424,7 +431,7 @@ int main(int argc, char *argv[])
         auto time_start = std::chrono::high_resolution_clock::now();
         auto workload = workloads[k];
         std::vector<double> stride;
-        for(int j = 0; j < 4; ++j)
+        for (int j = 0; j < 4; ++j)
             stride.push_back((workloads[k + 1][j] - workloads[k][j]) / env.steps);
 
         for (size_t i = 0; i < env.steps; i++)
@@ -484,7 +491,8 @@ int main(int argc, char *argv[])
                 break;
             }
 
-            if (cur_N >= env.N * 2) {
+            if (cur_N >= env.N * 2)
+            {
                 env.N = cur_N;
                 env.M = env.M * 2;
                 env.B = int(env.M - env.bits_per_element * env.N) >> 3;
@@ -501,13 +509,14 @@ int main(int argc, char *argv[])
         while (true)
         {
             db->GetIntProperty(DB::Properties::kNumRunningFlushes,
-                            &num_running_flushes);
+                               &num_running_flushes);
             db->GetIntProperty(DB::Properties::kMemTableFlushPending,
-                            &num_pending_flushes);
+                               &num_pending_flushes);
             if (num_running_flushes == 0 && num_pending_flushes == 0)
                 break;
         }
-        while (compactor->compactions_left_count > 0);
+        while (compactor->compactions_left_count > 0)
+            ;
         while (compactor->requires_compaction(db))
         {
             while (compactor->compactions_left_count > 0)

@@ -25,7 +25,7 @@ config_yaml_path = os.path.join("lrkv/config/config.yaml")
 with open(config_yaml_path) as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 scaling = config["lsm_tree_config"]["scaling"]
-scaling = 10
+scaling = 1
 E = config["lsm_tree_config"]["E"] / 8
 Q = int(config["lsm_tree_config"]["Q"] * scaling)
 B = int(4000 / E)
@@ -34,13 +34,30 @@ M = int(config["lsm_tree_config"]["M"] * scaling)
 N = int(config["lsm_tree_config"]["N"] * scaling)
 sel = config["lsm_tree_config"]["s"]
 workloads = [
-    (0.01, 0.01, 0.01, 0.97),
+    (0.91, 0.03, 0.03, 0.03),
+    (0.75, 0.15, 0.05, 0.05),
+    (0.60, 0.30, 0.05, 0.05),
+    (0.45, 0.45, 0.05, 0.05),
+    (0.30, 0.60, 0.05, 0.05),
+    (0.15, 0.75, 0.05, 0.05),
+    (0.03, 0.91, 0.03, 0.03),
+    (0.05, 0.75, 0.15, 0.05),
+    (0.05, 0.60, 0.30, 0.05),
+    (0.05, 0.45, 0.45, 0.05),
+    (0.05, 0.30, 0.60, 0.05),
+    (0.05, 0.15, 0.75, 0.05),
+    (0.03, 0.03, 0.91, 0.03),
+    (0.05, 0.05, 0.75, 0.15),
+    (0.05, 0.05, 0.60, 0.30),
+    (0.05, 0.05, 0.45, 0.45),
+    (0.05, 0.05, 0.30, 0.60),
     (0.05, 0.05, 0.15, 0.75),
+    (0.03, 0.03, 0.03, 0.91),
+    (0.15, 0.05, 0.05, 0.75),
+    (0.30, 0.05, 0.05, 0.60),
     (0.45, 0.05, 0.05, 0.45),
-    (0.33, 0.33, 0.01, 0.33),
+    (0.60, 0.05, 0.05, 0.30),
     (0.75, 0.05, 0.05, 0.15),
-    (0.45, 0.05, 0.05, 0.45),
-    (0.05, 0.05, 0.15, 0.75),
 ]
 
 optimal_params_filename = "optimal_params.in"
@@ -48,6 +65,7 @@ if os.path.exists(optimal_params_filename):
     os.remove(optimal_params_filename)
 
 dists = ["uniform"]
+
 
 class Optimizer(object):
     def __init__(self, config):
@@ -57,34 +75,64 @@ class Optimizer(object):
         self.latency_per_workload_prog = re.compile(
             r"\[[0-9:.]+\]\[info\] latency_per_workload : " r"(\[[0-9,\s]+\])"
         )
-        self.level_cost_models = pkl.load(
-            open(self.config["xgb_model"]["level_xgb_cost_model"], "rb")
-        )
 
-    def get_optimal_param(self, workload):
+    def get_optimal_param(self, workload, model="lr"):
         optimal_params_file = open(optimal_params_filename, "a")
         z0, z1, q, w = workload
-        (
-            best_T,
-            best_h,
-            best_ratio,
-            best_var,
-            best_cost,
-        ) = model_xgb.traverse_var_optimizer_uniform(
-            self.level_cost_models,
-            1,
-            z0,
-            z1,
-            q,
-            w,
-            E,
-            M / scaling,
-            N / scaling,
-        )
+        if model == "lr":
+            level_cost_models = pkl.load(
+                open(self.config["lr_model"]["level_lr_cost_model"], "rb")
+            )
+            level_cache_models = pkl.load(
+                open(self.config["lr_model"]["level_lr_cache_model"], "rb")
+            )
+
+            (
+                best_T,
+                best_h,
+                best_ratio,
+                best_var,
+                best_cost,
+            ) = model_lr.traverse_var_optimizer_uniform(
+                level_cache_models,
+                level_cost_models,
+                z0,
+                z1,
+                q,
+                w,
+                "level",
+                E,
+                M / scaling,
+                N / scaling,
+            )
+            optimal_params_file.write(
+                f"{z0} {z1} {q} {w} {best_T} {best_h} {best_ratio}\n"
+            )
+            return [z0, z1, q, w, best_T, best_h, best_ratio]
+        else:
+            level_cost_models = pkl.load(
+                open(self.config["xgb_model"]["level_xgb_cost_model"], "rb")
+            )
+            (
+                best_T,
+                best_h,
+                best_ratio,
+                best_var,
+                best_cost,
+            ) = model_xgb.traverse_var_optimizer_uniform(
+                level_cost_models,
+                1,
+                z0,
+                z1,
+                q,
+                w,
+                E,
+                M / scaling,
+                N / scaling,
+            )
 
         optimal_params_file.write(f"{z0} {z1} {q} {w} {best_T} {best_h} {best_ratio}\n")
         return [z0, z1, q, w, best_T, best_h, best_ratio]
-
 
     def start_db_runner(self, tuning_T, tuning_h, default_config):
         cmd = [
@@ -129,9 +177,11 @@ class Optimizer(object):
             proc.kill()
             return results
         try:
-            latency_per_workload = self.latency_per_workload_prog.findall(proc_results)[0]
+            latency_per_workload = self.latency_per_workload_prog.findall(proc_results)[
+                0
+            ]
             latency_per_workload = latency_per_workload.strip()
-            results = latency_per_workload.strip('][').split(', ')
+            results = latency_per_workload.strip("][").split(", ")
             results = [int(r) for r in results]
             return results
         except:
@@ -139,39 +189,57 @@ class Optimizer(object):
             proc.kill()
             return results
 
-
     def run(self):
         cases = []
         for workload in workloads:
-            case = self.get_optimal_param(workload)
+            case = self.get_optimal_param(workload, "xgb")
             cases.append(case)
 
-        latency_ht = self.start_db_runner(tuning_T=True, tuning_h=True, default_config=False)
-        latency_t = self.start_db_runner(tuning_T=True, tuning_h=False, default_config=False)
-        latency_h = self.start_db_runner(tuning_T=False, tuning_h=True, default_config=False)
-        latency_default = self.start_db_runner(tuning_T=False, tuning_h=False, default_config=True)
+        latency_ht = self.start_db_runner(
+            tuning_T=True, tuning_h=True, default_config=False
+        )
+        latency_t = self.start_db_runner(
+            tuning_T=True, tuning_h=False, default_config=False
+        )
+        # latency_h = self.start_db_runner(
+        #     tuning_T=False, tuning_h=True, default_config=False
+        # )
+        latency_default = self.start_db_runner(
+            tuning_T=False, tuning_h=False, default_config=True
+        )
 
         print("latency_ht: ", latency_ht)
         print("latency_t: ", latency_t)
-        print("latency_h: ", latency_h)
+        # print("latency_h: ", latency_h)
         print("latency_default: ", latency_default)
 
         df = []
         for i in range(len(cases) - 1):
             row = {}
-            row["source_z0"], row["source_z1"], row["source_q"], row["source_w"] = cases[i][: 4]
-            row["target_z0"], row["target_z1"], row["target_q"], row["target_w"] = cases[i + 1][: 4]
+            (
+                row["source_z0"],
+                row["source_z1"],
+                row["source_q"],
+                row["source_w"],
+            ) = cases[i][:4]
+            (
+                row["target_z0"],
+                row["target_z1"],
+                row["target_q"],
+                row["target_w"],
+            ) = cases[i + 1][:4]
             row["N"] = N
             row["M"] = M
             row["s"] = Q
-            row["T"], row["h"], row["ratio"] = cases[i + 1][4: ]
+            row["T"], row["h"], row["ratio"] = cases[i + 1][4:]
             row["latency_tuning_ht"] = latency_ht[i]
-            row["latency_tuning_T"] = latency_t[i]
-            row["latency_tuning_h"] = latency_h[i]
+            # row["latency_tuning_T"] = latency_t[i]
+            # row["latency_tuning_h"] = latency_h[i]
             row["latency_rocksdb"] = latency_default[i]
             df.append(row)
 
         pd.DataFrame(df).to_csv("optimizer_data/dynamic_tuning_results.csv")
+
 
 if __name__ == "__main__":
     # Load configuration
