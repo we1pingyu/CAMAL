@@ -21,8 +21,6 @@ bool CompactorOptions::read_config(std::string config_path)
     read_cfg >> cfg;
 
     this->size_ratio = cfg["size_ratio"];
-    this->lower_level_run_max = cfg["lower_level_run_max"];
-    this->largest_level_run_max = cfg["largest_level_run_max"];
     this->buffer_size = cfg["buffer_size"];
     this->entry_size = cfg["entry_size"];
     this->bits_per_element = cfg["bits_per_element"];
@@ -39,8 +37,6 @@ bool CompactorOptions::write_config(std::string config_path)
 {
     json cfg;
     cfg["size_ratio"] = this->size_ratio;
-    cfg["lower_level_run_max"] = this->lower_level_run_max;
-    cfg["largest_level_run_max"] = this->largest_level_run_max;
     cfg["buffer_size"] = this->buffer_size;
     cfg["entry_size"] = this->entry_size;
     cfg["bits_per_element"] = this->bits_per_element;

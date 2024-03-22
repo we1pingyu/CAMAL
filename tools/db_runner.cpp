@@ -36,9 +36,11 @@ typedef struct environment
     std::string compaction_style = "level";
     // Build mode
     double T = 10;
+    double K = 0;
 
-    size_t B = 1 << 18; //> 1 KB
-    size_t E = 1 << 7;  //> 128 B
+    size_t B = 1 << 18;         //> 1 KB (bits base)
+    size_t E = 1 << 7;          //> 128 B
+    size_t file_size = 4 << 20; //> 4 MB;
     double bits_per_element = 5.0;
     size_t N = 1e6;
     size_t L = 0;
@@ -46,12 +48,10 @@ typedef struct environment
     int verbose = 0;
     bool destroy_db = true;
 
-    int max_rocksdb_levels = 16;
-    int parallelism = 1;
+    int max_rocksdb_levels = 64;
+    int parallelism = 32;
 
     int seed = 0;
-    tmpdb::file_size_policy file_size_policy_opt = tmpdb::file_size_policy::INCREASING;
-    uint64_t fixed_file_size = std::numeric_limits<uint64_t>::max();
 
     std::string dist_mode = "zipfian";
     double skew = 0.5;
@@ -80,6 +80,8 @@ environment parse_args(int argc, char *argv[])
     auto build_opt = ("build options:" % ((value("db_path", env.db_path)) % "path to the db",
                                           (option("-N", "--entries") & integer("num", env.N)) % ("total entries, default pick [default: " + to_string(env.N) + "]"),
                                           (option("-T", "--size-ratio") & number("ratio", env.T)) % ("size ratio, [default: " + fmt::format("{:.0f}", env.T) + "]"),
+                                          (option("-K", "--runs-number") & number("runs", env.K)) % ("size ratio, [default: " + fmt::format("{:.0f}", env.K) + "]"),
+                                          (option("-f", "--file-size") & integer("size", env.file_size)) % ("file size (in bytes), [default: " + to_string(env.file_size) + "]"),
                                           (option("-B", "--buffer-size") & integer("size", env.B)) % ("buffer size (in bytes), [default: " + to_string(env.B) + "]"),
                                           (option("-E", "--entry-size") & integer("size", env.E)) % ("entry size (bytes) [default: " + to_string(env.E) + ", min: 32]"),
                                           (option("-b", "--bpe") & number("bits", env.bits_per_element)) % ("bits per entry per bloom filter [default: " + fmt::format("{:.1f}", env.bits_per_element) + "]"),
@@ -102,19 +104,10 @@ environment parse_args(int argc, char *argv[])
                                           (option("--parallelism") & integer("num", env.parallelism)) % ("parallelism for writing to db [default: " + to_string(env.parallelism) + "]"),
                                           (option("--seed") & integer("num", env.seed)) % "seed for generating data [default: random from time]"));
 
-    auto file_size_policy_opt =
-        ("file size policy (pick one)" %
-         one_of(
-             (
-                 option("--increasing_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::INCREASING) % "file size will match run size as LSM tree grows (default)",
-                 (option("--fixed_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::FIXED) & opt_integer("size", env.fixed_file_size)) % "fixed file size specified after fixed_files flag [default size MAX uint64]",
-                 option("--buffer_files").set(env.file_size_policy_opt, tmpdb::file_size_policy::BUFFER) % "file size matches the buffer size")));
-
     auto cli = (general_opt,
                 build_opt,
                 run_opt,
-                minor_opt,
-                file_size_policy_opt);
+                minor_opt);
 
     if (!parse(argc, argv, cli))
         help = true;
@@ -138,13 +131,8 @@ environment parse_args(int argc, char *argv[])
 size_t estimate_levels(size_t N, double T, size_t E, size_t B)
 {
     if ((N * E) < B)
-    {
         return 1;
-    }
-
-    size_t estimated_levels = std::ceil(std::log((N * E / B) + 1) / std::log(T));
-
-    return estimated_levels;
+    return std::ceil(std::log((N * E / B) + 1) / std::log(T));
 }
 
 void print_db_status(rocksdb::DB *db)
@@ -196,77 +184,52 @@ int main(int argc, char *argv[])
 
     spdlog::info("Building DB: {}", env.db_path);
     rocksdb::Options rocksdb_opt;
-    // rocksdb_opt.memtable_factory.reset(rocksdb::NewHashSkipListRepFactory());
-    // rocksdb_opt.db = rocksdb::NewInMemoryDbOptions();
 
     rocksdb_opt.create_if_missing = true;
     rocksdb_opt.error_if_exists = true;
-    // rocksdb_opt.IncreaseParallelism(env.parallelism);
+    rocksdb_opt.IncreaseParallelism(env.parallelism);
     rocksdb_opt.compression = rocksdb::kNoCompression;
     rocksdb_opt.bottommost_compression = kNoCompression;
-    // rocksdb_opt.use_direct_reads = true;
-    // rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
+    rocksdb_opt.use_direct_reads = true;
+    rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.advise_random_on_open = false;
     rocksdb_opt.random_access_max_buffer_size = 0;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
-    // rocksdb_opt.max_background_jobs = 1;
-    rocksdb_opt.target_file_size_base = env.scaling * 1048576;
-    // rocksdb_opt.target_file_size_multiplier = env.T;
+    rocksdb_opt.target_file_size_base = env.scaling * env.file_size;
+    rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
+    rocksdb_opt.disable_auto_compactions = true;
+    rocksdb_opt.write_buffer_size = env.B / 2;
+
     tmpdb::Compactor *compactor = nullptr;
     tmpdb::CompactorOptions compactor_opt;
-
+    compactor_opt.file_size = env.scaling * env.file_size;
+    compactor_opt.size_ratio = env.T;
+    compactor_opt.buffer_size = env.B;
+    compactor_opt.entry_size = env.E;
+    compactor_opt.bits_per_element = env.bits_per_element;
+    compactor_opt.num_entries = env.N;
     if (env.compaction_style == "level")
-    {
-        rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
-        rocksdb_opt.disable_auto_compactions = true;
-        rocksdb_opt.write_buffer_size = env.B / 2;
-        compactor_opt.tiered_policy = false;
-        compactor_opt.size_ratio = env.T;
-        compactor_opt.buffer_size = env.B;
-        compactor_opt.entry_size = env.E;
-        compactor_opt.bits_per_element = env.bits_per_element;
-        compactor_opt.num_entries = env.N;
-        compactor_opt.levels = tmpdb::Compactor::estimate_levels(env.N, env.T, env.E, env.B) + 2;
-        rocksdb_opt.num_levels = compactor_opt.levels + 1;
-        compactor = new tmpdb::Compactor(compactor_opt, rocksdb_opt);
-        rocksdb_opt.listeners.emplace_back(compactor);
-    }
+        compactor_opt.K = 1;
+    else if (env.compaction_style == "tier")
+        compactor_opt.K = env.T;
     else
-    {
-        rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
-        rocksdb_opt.disable_auto_compactions = true;
-        rocksdb_opt.write_buffer_size = env.B / 2;
-        compactor_opt.size_ratio = env.T;
-        compactor_opt.buffer_size = env.B;
-        compactor_opt.entry_size = env.E;
-        compactor_opt.bits_per_element = env.bits_per_element;
-        compactor_opt.num_entries = env.N;
-        compactor_opt.levels = tmpdb::Compactor::estimate_levels(env.N, env.T, env.E, env.B) + 1;
-        rocksdb_opt.num_levels = (env.T - 1) * compactor_opt.levels + 1;
-        compactor = new tmpdb::Compactor(compactor_opt, rocksdb_opt);
-        rocksdb_opt.listeners.emplace_back(compactor);
-    }
+        compactor_opt.K = env.K;
+    compactor_opt.levels = tmpdb::Compactor::estimate_levels(env.N, env.T, env.E, env.B) * compactor_opt.K + 1;
+    rocksdb_opt.num_levels = compactor_opt.levels + 1;
+    compactor = new tmpdb::Compactor(compactor_opt, rocksdb_opt);
+    rocksdb_opt.listeners.emplace_back(compactor);
 
     rocksdb::BlockBasedTableOptions table_options;
-    // table_options.block_size = 4096;
-    if (env.compaction_style == "level")
-    {
-        table_options.filter_policy.reset(
-            rocksdb::NewMonkeyFilterPolicy(
-                env.bits_per_element,
-                rocksdb_opt.max_bytes_for_level_multiplier,
-                compactor_opt.levels));
-    }
-    else
-    {
-        table_options.filter_policy.reset(
-            rocksdb::NewMonkeyFilterPolicy(
-                env.bits_per_element,
-                compactor_opt.size_ratio,
-                compactor_opt.levels));
-    }
+
+    table_options.filter_policy.reset(
+        rocksdb::NewMonkeyFilterPolicy(
+            env.bits_per_element,
+            compactor_opt.size_ratio,
+            compactor_opt.levels));
+
     // table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(env.bits_per_element));
+
     if (env.cache_cap == 0)
         table_options.no_block_cache = true;
     else
@@ -277,7 +240,6 @@ int main(int argc, char *argv[])
     rocksdb_opt.statistics = rocksdb::CreateDBStatistics();
     rocksdb::DB *db = nullptr;
     rocksdb::Status status = rocksdb::DB::Open(rocksdb_opt, env.db_path, &db);
-    // db->SetDBOptions({{"stats_level", "kExceptDetailedTimers"}});
     if (!status.ok())
     {
         spdlog::error("Problems opening DB");
@@ -287,28 +249,13 @@ int main(int argc, char *argv[])
     }
 
     std::map<std::string, uint64_t> stats;
-    // uint64_t num_running_compactions, num_pending_compactions, num_running_flushes, num_pending_flushes;
-    uint64_t num_running_flushes, num_pending_flushes;
     KeyLog *key_log = new KeyLog(env.key_log_file);
     rocksdb::WriteOptions write_opt;
-    write_opt.low_pri = true; //> every insert is less important than compaction
+    write_opt.low_pri = true;
     write_opt.disableWAL = true;
     DataGenerator *data_gen = new YCSBGenerator(env.N, "uniform", 0.0);
     std::pair<std::string, std::string> key_value;
     auto write_time_start = std::chrono::high_resolution_clock::now();
-    // size_t batch_size = 10;
-    // for (size_t entry_num = 0; entry_num < env.N; entry_num += batch_size)
-    // {
-    //     // spdlog::info("{}", entry_num);
-    //     rocksdb::WriteBatch batch(0, UINT64_MAX);
-    //     for (int i = 0; i < (int)batch_size; i++)
-    //     {
-    //         key_value =
-    //             data_gen->gen_kv_pair(env.E);
-    //         batch.Put(key_value.first, key_value.second);
-    //     }
-    //     db->Write(write_opt, &batch);
-    // }
     for (size_t entry_num = 0; entry_num < env.N; entry_num += 1)
     {
         // spdlog::info("{}", entry_num);
@@ -317,43 +264,7 @@ int main(int argc, char *argv[])
     }
     spdlog::info("Waiting for all compactions to finish before running");
     rocksdb::FlushOptions flush_opt;
-    // db->Flush(flush_opt);
-    // if (env.compaction_style == "level")
-    // {
-    //     while (true)
-    //     {
-    //         db->GetIntProperty(DB::Properties::kNumRunningFlushes,
-    //                            &num_running_flushes);
-    //         db->GetIntProperty(DB::Properties::kMemTableFlushPending,
-    //                            &num_pending_flushes);
-    //         db->GetIntProperty(DB::Properties::kNumRunningCompactions,
-    //                            &num_running_compactions);
-    //         db->GetIntProperty(DB::Properties::kCompactionPending,
-    //                            &num_pending_compactions);
-    //         if (num_running_compactions == 0 && num_pending_compactions == 0 && num_running_flushes == 0 && num_pending_flushes == 0)
-    //             break;
-    //     }
-    // }
-    // else
-    {
-        while (true)
-        {
-            db->GetIntProperty(DB::Properties::kNumRunningFlushes,
-                               &num_running_flushes);
-            db->GetIntProperty(DB::Properties::kMemTableFlushPending,
-                               &num_pending_flushes);
-            if (num_running_flushes == 0 && num_pending_flushes == 0)
-                break;
-        }
-        while (compactor->compactions_left_count > 0)
-            ;
-    }
-    while (compactor->requires_compaction(db))
-    {
-        while (compactor->compactions_left_count > 0)
-            ;
-    }
-    // }
+
     auto write_time_end = std::chrono::high_resolution_clock::now();
     auto write_time = std::chrono::duration_cast<std::chrono::milliseconds>(write_time_end - write_time_start).count();
     spdlog::info("(init_time) : ({})", write_time);
@@ -405,21 +316,21 @@ int main(int argc, char *argv[])
         case 0:
         {
             key = data_gen->gen_new_dup_key();
-            key_log->log_key(key);
+            // key_log->log_key(key);
             status = db->Get(rocksdb::ReadOptions(), key, &value);
             break;
         }
         case 1:
         {
             key = data_gen->gen_existing_key();
-            key_log->log_key(key);
+            // key_log->log_key(key);
             status = db->Get(rocksdb::ReadOptions(), key, &value);
             break;
         }
         case 2:
         {
             key = data_gen->gen_existing_key();
-            key_log->log_key(key);
+            // key_log->log_key(key);
             limit = std::to_string(stoi(key) + 1 + env.sel);
             for (it->Seek(rocksdb::Slice(key)); it->Valid() && it->key().ToString() < limit; it->Next())
             {
@@ -429,9 +340,9 @@ int main(int argc, char *argv[])
         }
         case 3:
         {
-            // key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
+            key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
             // key_log->log_key(key_value.first);
-            // db->Put(write_opt, key_value.first, key_value.second);
+            db->Put(write_opt, key_value.first, key_value.second);
             break;
         }
         default:
@@ -439,48 +350,12 @@ int main(int argc, char *argv[])
         }
     }
     delete it;
-    // spdlog::info("Flushing DB...");
-    // db->Flush(flush_opt);
-    spdlog::info("Waiting for all remaining background compactions to finish");
-    // if (env.compaction_style == "level")
-    // {
-    //     while (true)
-    //     {
-    //         db->GetIntProperty(DB::Properties::kNumRunningFlushes,
-    //                            &num_running_flushes);
-    //         db->GetIntProperty(DB::Properties::kMemTableFlushPending,
-    //                            &num_pending_flushes);
-    //         db->GetIntProperty(DB::Properties::kNumRunningCompactions,
-    //                            &num_running_compactions);
-    //         db->GetIntProperty(DB::Properties::kCompactionPending,
-    //                            &num_pending_compactions);
-    //         if (num_running_compactions == 0 && num_pending_compactions == 0 && num_running_flushes == 0 && num_pending_flushes == 0)
-    //             break;
-    //     }
-    // }
-    // else
-    {
-        while (true)
-        {
-            db->GetIntProperty(DB::Properties::kNumRunningFlushes,
-                               &num_running_flushes);
-            db->GetIntProperty(DB::Properties::kMemTableFlushPending,
-                               &num_pending_flushes);
-            if (num_running_flushes == 0 && num_pending_flushes == 0)
-                break;
-        }
-        while (compactor->compactions_left_count > 0)
-            ;
-    }
-    while (compactor->requires_compaction(db))
-    {
-        while (compactor->compactions_left_count > 0)
-            ;
-    }
-    // }
+
+    // while (compactor->compactions_left_count > 0)
+    //     ;
+
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
-    latency += write_time * env.writes * env.steps / env.N;
     db->GetColumnFamilyMetaData(&cf_meta);
     run_per_level = "[";
     for (auto &level : cf_meta.levels)

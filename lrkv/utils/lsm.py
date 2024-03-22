@@ -30,6 +30,23 @@ def weight_sampling(l, o, n, r):
     return r
 
 
+def weight_sampling_2d(l, o1, o2, n, r):
+    a = []
+    b = []
+    for i in l:
+        a.append([i[o1], i[o2]])
+        b.append(1.0 / i[-1])
+    i = 0
+    while len(r) < n:
+        if i > 1e5:
+            break
+        i += 1
+        s = random.choices(a, weights=b)[0]
+        if s not in r:
+            r.append(s)
+    return r
+
+
 def estimate_level(N, mbuf, T, E, get_ceiling=True):
     l = np.log(((N * E / 8) / (mbuf + 1)) + 1) / np.log(T)
     # print(N, E, mbuf, T)

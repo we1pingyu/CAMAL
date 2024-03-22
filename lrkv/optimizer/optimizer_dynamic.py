@@ -144,7 +144,7 @@ class Optimizer(object):
             f"-s {Q}",
             f"--sel {sel}",
             f"--scaling {scaling}",
-            f"--parallelism 28",
+            f"--parallelism 32",
             f"--dist uniform",
             f"--skew 0.0",
             f"--cache 0.0",

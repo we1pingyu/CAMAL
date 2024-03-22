@@ -49,6 +49,7 @@ optimizer_data/
 *.pdf
 *.dat
 *.pkl
+*.csv
 model/
 plot/
 lrkv/optimizer/test*

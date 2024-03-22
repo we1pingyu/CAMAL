@@ -6,20 +6,18 @@ app:
     DATA_DIR: "data"
 
     EXECUTION_PATH: "build/db_runner"
-    # EXECUTION_PATH: "build/sim_runner"
     DATABASE_PATH: "/tmp"
-    # DATABASE_PATH: "/dev/shm"
     KEY_FILE_PATH: "data/keys.data"
 
 lsm_tree_config: 
     samples: 3
     scaling: 1 # 1 for training, 10 for testing
-    M: 1677721.6 
-    N: 100000.0
-    Q: 50000.0
+    M: 16777216 
+    N: 1000000
+    Q:   50000
     phi: 1 # endure parameter
     s: 0       # Average range query selectivity
-    E: 8000         # Size of data entries in bits
+    E: 8192         # Size of data entries in bits
 
 jobs:
     job_list:
@@ -30,25 +28,28 @@ experiments:
         - "LevelCost"
 
 lr_model:
-    level_lr_cache_model: "model/level_lr_sim_cache_model.pkl"
-    level_lr_cost_model: "model/level_lr_sim_cost_model.pkl"
-    tier_lr_cache_model: "model/tier_lr_sim_cache_model.pkl"
-    tier_lr_cost_model: "model/tier_lr_sim_cost_model.pkl"
+    level_lr_cache_model: "data/level_lr_sim_cache_model.pkl"
+    level_lr_cost_model: "data/level_lr_sim_cost_model.pkl"
+    tier_lr_cache_model: "data/tier_lr_sim_cache_model.pkl"
+    tier_lr_cost_model: "data/tier_lr_sim_cost_model.pkl"
 
 xgb_model:
-    level_xgb_cost_model: "model/level_cost_xgb_uni_sim.pkl"
-    tier_xgb_cost_model: "model/tier_cost_xgb_uni_sim.pkl"
+    level_xgb_cost_model: "data/level_cost_xgb_uni.pkl"
+    tier_xgb_cost_model: "data/tier_cost_xgb_uni.pkl"
+    ext_xgb_cost_model: "data/ext_cost_xgb_uni.pkl"
 
 samples_path:
-    lr_level_ckpt: "raw_data/samples_sim_lr_level_uniform_ckpt.csv"
-    lr_level_final: "raw_data/samples_sim_lr_level_uniform_final.csv"
-    lr_tier_ckpt: "raw_data/samples_sim_lr_tier_uniform_ckpt.csv"
-    lr_tier_final: "raw_data/samples_sim_lr_tier_uniform_final.csv"
-    xgb_level_ckpt: "raw_data/samples_sim_xgb_level_uniform_ckpt.csv"
-    xgb_level_final: "raw_data/samples_sim_xgb_level_uniform_final.csv"
-    xgb_tier_ckpt: "raw_data/samples_sim_xgb_tier_uniform_ckpt.csv"
-    xgb_tier_final: "raw_data/samples_sim_xgb_tier_uniform_final.csv"
+    lr_level_ckpt: "data/samples_lr_level_uniform_ckpt.csv"
+    lr_level_final: "data/samples_lr_level_uniform_final.csv"
+    lr_tier_ckpt: "data/samples_lr_tier_uniform_ckpt.csv"
+    lr_tier_final: "data/samples_lr_tier_uniform_final.csv"
+    xgb_level_ckpt: "data/samples_xgb_level_uniform_ckpt.csv"
+    xgb_level_final: "data/samples_xgb_level_uniform_final.csv"
+    xgb_tier_ckpt: "data/samples_xgb_tier_uniform_ckpt.csv"
+    xgb_tier_final: "data/samples_xgb_tier_uniform_final.csv"
+    xgb_ext_ckpt: "data/samples_xgb_ext_uniform_ckpt.csv"
+    xgb_ext_final: "data/samples_xgb_ext_uniform_final.csv"
 
 optimizer_path:
-    ckpt: "optimizer_data/optimizer_sim_uniform_ckpt_.csv"
-    final: "optimizer_data/optimizer_sim_uniform_final_.csv"
+    ckpt: "optimizer_uniform_ckpt.csv"
+    final: "optimizer_uniform_final.csv"

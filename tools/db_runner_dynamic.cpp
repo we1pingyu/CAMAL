@@ -57,7 +57,7 @@ typedef struct environment
     bool destroy_db = true;
 
     int max_rocksdb_levels = 16;
-    int parallelism = 1;
+    int parallelism = 32;
 
     int seed = 0;
     tmpdb::file_size_policy file_size_policy_opt = tmpdb::file_size_policy::INCREASING;
@@ -264,7 +264,6 @@ int main(int argc, char *argv[])
         rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
         rocksdb_opt.disable_auto_compactions = true;
         rocksdb_opt.write_buffer_size = env.B / 2;
-        compactor_opt.tiered_policy = false;
         compactor_opt.size_ratio = env.T;
         compactor_opt.buffer_size = env.B;
         compactor_opt.entry_size = env.E;

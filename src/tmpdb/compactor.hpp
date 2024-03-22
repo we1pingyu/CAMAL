@@ -93,17 +93,6 @@ namespace tmpdb
         virtual CompactionTask *PickCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) = 0;
 
         /**
-         * @brief Picks and returns a compaction task given the specified DB and column family.
-         * It is the caller's responsibility to destroy the returned CompactionTask.
-         *
-         * @param db An open database
-         * @param cf_name Names of the column families
-         * @param level Target level id
-         *
-         * @returns CompactionTask Will return a "nullptr" if it cannot find a proper compaction task.
-         */
-        virtual CompactionTask *PickLevelCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) = 0;
-        /**
          * @brief Schedule and run the specified compaction task in background.
          *
          * @param task
@@ -151,15 +140,6 @@ namespace tmpdb
          * @return CompactionTask*
          */
         CompactionTask *PickCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) override;
-        /**
-         * @brief
-         *
-         * @param db
-         * @param cf_name
-         * @param level
-         * @return CompactionTask*
-         */
-        CompactionTask *PickLevelCompaction(rocksdb::DB *db, const std::string &cf_name, const size_t level) override;
         /**
          * @brief
          *

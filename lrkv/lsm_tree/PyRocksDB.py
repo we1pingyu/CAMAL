@@ -1,6 +1,7 @@
 """
 Python API for RocksDB
 """
+
 import logging
 import os
 import re
@@ -8,7 +9,7 @@ import shutil
 import subprocess
 import numpy as np
 
-THREADS = 28
+THREADS = 32
 
 
 class RocksDB(object):
@@ -104,7 +105,10 @@ class RocksDB(object):
         steps,
         sel=0,
         is_leveling_policy=True,
+        auto_compaction=False,
         cache_cap=0,
+        K="",
+        f="",
         key_log="",
         scaling=1,
     ):
@@ -118,12 +122,15 @@ class RocksDB(object):
         self.path_db = path_db
         self.db_name = db_name
         self.h, self.T = h, int(np.ceil(T))
+        self.K = K
         self.N, self.M = int(N), int(M)
         self.E = E >> 3  # Converts bits -> bytes
         if is_leveling_policy:
             self.compaction_style = "level"
         else:
             self.compaction_style = "tier"
+        if auto_compaction:
+            self.compaction_style = "auto"
         os.makedirs(os.path.join(self.path_db, self.db_name), exist_ok=True)
         mbuff = int(self.M - (self.h * self.N)) >> 3
         db_dir = os.path.join(self.path_db, self.db_name)
@@ -132,9 +139,11 @@ class RocksDB(object):
             db_dir,
             f"-N {self.N}",
             f"-T {self.T}",
+            f"-K {K}" if K != "" else "",
             f"-B {mbuff}",
             f"-E {self.E}",
             f"-b {self.h}",
+            f"-f {f}" if f != "" else "",
             f"-e {num_z0}",
             f"-r {num_z1}",
             f"-q {num_q}",
