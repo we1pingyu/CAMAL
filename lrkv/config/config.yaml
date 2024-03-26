@@ -12,12 +12,12 @@ app:
 lsm_tree_config: 
     samples: 3
     scaling: 1 # 1 for training, 10 for testing
-    M: 16777216 
+    M: 13400000 # 16MB/10
     N: 1000000
     Q:   50000
     phi: 1 # endure parameter
-    s: 0       # Average range query selectivity
-    E: 8192         # Size of data entries in bits
+    s: 1       # Average range query selectivity
+    E: 8000    # Size of data entries in bits (leave space in a block for meta)
 
 jobs:
     job_list:
@@ -28,10 +28,10 @@ experiments:
         - "LevelCost"
 
 lr_model:
-    level_lr_cache_model: "data/level_lr_sim_cache_model.pkl"
-    level_lr_cost_model: "data/level_lr_sim_cost_model.pkl"
-    tier_lr_cache_model: "data/tier_lr_sim_cache_model.pkl"
-    tier_lr_cost_model: "data/tier_lr_sim_cost_model.pkl"
+    level_lr_cache_model: "data/level_lr_cache_model.pkl"
+    level_lr_cost_model: "data/level_lr_cost_model.pkl"
+    tier_lr_cache_model: "data/tier_lr_cache_model.pkl"
+    tier_lr_cost_model: "data/tier_lr_cost_model.pkl"
 
 xgb_model:
     level_xgb_cost_model: "data/level_cost_xgb_uni.pkl"

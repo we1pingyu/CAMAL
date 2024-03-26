@@ -57,7 +57,7 @@ typedef struct environment
     bool destroy_db = true;
 
     int max_rocksdb_levels = 16;
-    int parallelism = 32;
+    int parallelism = 1;
 
     int seed = 0;
     tmpdb::file_size_policy file_size_policy_opt = tmpdb::file_size_policy::INCREASING;

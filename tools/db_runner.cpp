@@ -38,9 +38,9 @@ typedef struct environment
     double T = 10;
     double K = 0;
 
-    size_t B = 1 << 18;         //> 1 KB (bits base)
+    size_t B = 1 << 18;         //> 1 KB
     size_t E = 1 << 7;          //> 128 B
-    size_t file_size = 4 << 20; //> 4 MB;
+    size_t file_size = 6710886; //> 4 MB;
     double bits_per_element = 5.0;
     size_t N = 1e6;
     size_t L = 0;
@@ -49,7 +49,7 @@ typedef struct environment
     bool destroy_db = true;
 
     int max_rocksdb_levels = 64;
-    int parallelism = 32;
+    int parallelism = 1;
 
     int seed = 0;
 
@@ -193,17 +193,15 @@ int main(int argc, char *argv[])
     rocksdb_opt.use_direct_reads = true;
     rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
-    rocksdb_opt.advise_random_on_open = false;
-    rocksdb_opt.random_access_max_buffer_size = 0;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
     rocksdb_opt.target_file_size_base = env.scaling * env.file_size;
     rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
     rocksdb_opt.disable_auto_compactions = true;
+    // rocksdb_opt.max_background_jobs = 1;
     rocksdb_opt.write_buffer_size = env.B / 2;
 
     tmpdb::Compactor *compactor = nullptr;
     tmpdb::CompactorOptions compactor_opt;
-    compactor_opt.file_size = env.scaling * env.file_size;
     compactor_opt.size_ratio = env.T;
     compactor_opt.buffer_size = env.B;
     compactor_opt.entry_size = env.E;
@@ -258,12 +256,11 @@ int main(int argc, char *argv[])
     auto write_time_start = std::chrono::high_resolution_clock::now();
     for (size_t entry_num = 0; entry_num < env.N; entry_num += 1)
     {
-        // spdlog::info("{}", entry_num);
         key_value = data_gen->gen_kv_pair(env.E);
         db->Put(write_opt, key_value.first, key_value.second);
     }
-    spdlog::info("Waiting for all compactions to finish before running");
-    rocksdb::FlushOptions flush_opt;
+    while (compactor->compactions_left_count > 0)
+        ;
 
     auto write_time_end = std::chrono::high_resolution_clock::now();
     auto write_time = std::chrono::duration_cast<std::chrono::milliseconds>(write_time_end - write_time_start).count();
@@ -298,7 +295,7 @@ int main(int argc, char *argv[])
     data_gen = new YCSBGenerator(env.N, env.dist_mode, env.skew);
     rocksdb::Iterator *it = db->NewIterator(rocksdb::ReadOptions());
     auto time_start = std::chrono::high_resolution_clock::now();
-    env.sel = 4000 * env.sel / env.E;
+    env.sel = 4096 * env.sel / env.E;
     for (size_t i = 0; i < env.steps; i++)
     {
         double r = dist(engine);
@@ -351,8 +348,8 @@ int main(int argc, char *argv[])
     }
     delete it;
 
-    // while (compactor->compactions_left_count > 0)
-    //     ;
+    while (compactor->compactions_left_count > 0)
+        ;
 
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();

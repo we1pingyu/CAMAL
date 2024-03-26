@@ -104,7 +104,6 @@ def get_cache(current_T, current_h, current_ratio, alpha, c, z0, z1, q, w, M, N)
 
 
 def get_cost_uniform(
-    # is_leveling_policy,
     current_T,
     current_h,
     current_ratio,
@@ -116,7 +115,7 @@ def get_cost_uniform(
     M,
     N,
     K=5,
-    fs=4 << 20,
+    fs=6710886,
 ):
     h = current_ratio * current_h
     fpr = estimate_fpr(h)
@@ -125,7 +124,6 @@ def get_cost_uniform(
     cache_cap = (1 - current_ratio) * M / 8
     l = estimate_level(N, buffer, current_T, E)
     # print(N, buffer, current_T, E, l)
-    # is_leveling_policy = 1 if is_leveling_policy else 0
     return [z0, z1, q, w, current_T, l, fpr, cache_cap, buffer, K, fs]
 
 
@@ -159,7 +157,7 @@ def traverse_var_optimizer_uniform(cost_models, z0, z1, q, w, E, M, N):
         for K in range(1, 10):
             for h in range(2, 11):
                 for ratio in [0.9, 1.0]:
-                    for fs in [4 << 20, 8 << 20, 16 << 20]:
+                    for fs in [3355443, 6710886, 13421772]:
                         x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N, K, fs)
                         settings.append((T, K, h, ratio, fs))
                         xs.append(x)
@@ -185,7 +183,7 @@ def traverse_var_optimizer_uniform(cost_models, z0, z1, q, w, E, M, N):
 
 
 def traverse_for_TK(
-    cost_models, z0, z1, q, w, E, M, N, h0=10, ratio0=1.0, n=10, fs=4 << 20
+    cost_models, z0, z1, q, w, E, M, N, h0=10, ratio0=1.0, n=10, fs=6710886
 ):
     candidates = []
     for T in range(2, 100):
@@ -206,7 +204,7 @@ def traverse_for_TK(
 
 
 def traverse_for_h(
-    cost_models, z0, z1, q, w, E, M, N, T0=10, K0=1, ratio0=1.0, n=10, fs=4 << 20
+    cost_models, z0, z1, q, w, E, M, N, T0=10, K0=1, ratio0=1.0, n=10, fs=6710886
 ):
     candidates = []
     for h in range(2, 11):
@@ -226,10 +224,10 @@ def traverse_for_h(
 
 
 def traverse_for_fs(
-    cost_models, z0, z1, q, w, E, M, N, T0=10, K0=1, h0=8, ratio0=1.0, n=10
+    cost_models, z0, z1, q, w, E, M, N, T0=10, K0=1, h0=5, ratio0=1.0, n=10
 ):
     candidates = []
-    for fs in range(4 << 20, 8 << 20, 16 << 20):
+    for fs in [3355443, 6710886, 13421772]:
         T = T0
         h = h0
         ratio = ratio0

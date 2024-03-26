@@ -125,7 +125,7 @@ class LevelCost(object):
             row["N"],
             row["phi"],
             row["s"] / row["N"],
-            row["B"],
+            int(4000 * 8 / row["E"]),
             row["E"],
             row["M"],
             row["is_leveling_policy"],
@@ -194,7 +194,7 @@ class LevelCost(object):
             min_err = 1e9
             # for T in range(2, estimate_T(N, M / 2 / 8, 1, E) + 1):
             for T in range(2, 16):
-                err = T_tier_equation(T, z0, z1, q, w, sel, E, M, N, h0=8)
+                err = T_tier_equation(T, z0, z1, q, w, sel, E, M, N, h0=5)
                 if err < min_err:
                     min_err = err
                     temp = T

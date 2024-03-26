@@ -197,10 +197,10 @@ class LevelCost(object):
                     min_err = err
                     temp = T
             if df == []:
-                T_list = self.sample_around_x0(temp, self.samples, 2, 100)
+                T_list = self.sample_around_x0(temp, self.samples, 2, 200)
             else:
                 regr = iter_model(df, "level", E, M, N)
-                t = traverse_for_T([regr], z0, z1, q, w, E, M, N, h0=8, n=-1)
+                t = traverse_for_T([regr], z0, z1, q, w, E, M, N, h0=5, n=-1)
                 T_list = [temp]
                 T_list = weight_sampling(t, 0, self.samples, T_list)
             print(T_list)

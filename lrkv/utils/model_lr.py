@@ -112,7 +112,7 @@ def traverse_for_T(
 
 
 def traverse_for_h(
-    Ws, Wcs, z0, z1, q, w,  E, M, N,T0=10, ratio0=1.0, n=10, policy="level"
+    Ws, Wcs, z0, z1, q, w, E, M, N, T0=10, ratio0=1.0, n=10, policy="level"
 ):
     candidates = []
     for h in range(2, 11):

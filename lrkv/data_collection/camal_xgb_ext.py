@@ -195,7 +195,7 @@ class LevelCost(object):
             z0, z1, q, w = workload
             # Train and search optimal size ratio
             min_err = 1e9
-            fs = 4 << 20
+            fs = 6710886
             # for T in range(2, estimate_T(N, M / 2 / 8, 1, E) + 1):
             for T in range(2, 200):
                 err = T_level_equation(T, q, w)
@@ -211,7 +211,7 @@ class LevelCost(object):
                         TK_list.append((T, K))
             else:
                 regr = iter_model(df, E, M, N)
-                t = traverse_for_TK([regr], z0, z1, q, w, E, M, N, h0=8, n=-1, fs=fs)
+                t = traverse_for_TK([regr], z0, z1, q, w, E, M, N, h0=5, n=-1, fs=fs)
                 TK_list = weight_sampling_2d(t, 0, 1, self.samples * self.samples, [])
             z0, z1, q, w = workload
             ratio = 1.0
@@ -241,6 +241,7 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_ext_ckpt"])
                 step += 1
+                self.logger.info(f"Used {time.time()-start_time}s\n")
 
             # iter model
             regr = iter_model(df, E, M, N)
@@ -287,6 +288,7 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_ext_ckpt"])
                 step += 1
+                self.logger.info(f"Used {time.time()-start_time}s\n")
             # iter model
             regr = iter_model(df, E, M, N)
             candidates = traverse_for_h(
@@ -295,7 +297,7 @@ class LevelCost(object):
             # h0 = int((candidates[0][2] + h_list[0]) / 2)
             h0 = candidates[0][2]
 
-            for fs in [8 << 20, 16 << 20]:
+            for fs in [3355443, 13421772]:
                 buffer = ratio * (M - h0 * N)
                 cache_cap = (1 - ratio) * M / 8
                 size_ratio = T0
@@ -318,6 +320,7 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_ext_ckpt"])
                 step += 1
+                self.logger.info(f"Used {time.time()-start_time}s\n")
             # iter model
             regr = iter_model(df, E, M, N)
             candidates = traverse_for_fs(
@@ -350,6 +353,7 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_ext_ckpt"])
                 step += 1
+                self.logger.info(f"Used {time.time()-start_time}s\n")
 
         self.logger.info("Exporting data from xgb level")
         pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_ext_final"])

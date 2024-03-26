@@ -281,7 +281,7 @@ class Optimizer(object):
             row["T"] = 10
             row["h"] = 10
             best_h = 10
-            row["cache_cap"] = 0.125 * (M - best_h * N) / 8
+            row["cache_cap"] = 0.33 * (M - best_h * N) / 8
             row["M"] = M - row["cache_cap"] * 8
             self.logger.info(f"Building DB at size : {N}")
             db = RocksDB(self.config)
@@ -331,12 +331,6 @@ class Optimizer(object):
             level_cache_models = pkl.load(
                 open(self.config["lr_model"]["level_lr_cache_model"], "rb")
             )
-            tier_cost_models = pkl.load(
-                open(self.config["lr_model"]["tier_lr_cost_model"], "rb")
-            )
-            tier_cache_models = pkl.load(
-                open(self.config["lr_model"]["tier_lr_cache_model"], "rb")
-            )
             (
                 best_T,
                 best_h,
@@ -356,38 +350,47 @@ class Optimizer(object):
                 N / scaling,
             )
             row["is_leveling_policy"] = True
-            (
-                tier_best_T,
-                tier_best_h,
-                tier_best_ratio,
-                tier_best_var,
-                tier_best_cost,
-            ) = model_lr.traverse_var_optimizer_uniform(
-                tier_cache_models,
-                tier_cost_models,
-                z0,
-                z1,
-                q,
-                w,
-                "tier",
-                E,
-                M / scaling,
-                N / scaling,
-            )
             print(
                 f"level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio},best_var: {best_var}, best_cost:{best_cost*Q}"
             )
-            print(
-                f"tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}"
-            )
-            # if tier_best_cost < best_cost:
-            #     row["is_leveling_policy"] = False
-            #     best_T, best_h, best_ratio, best_cost = (
-            #         tier_best_T,
-            #         tier_best_h,
-            #         tier_best_ratio,
-            #         tier_best_cost,
-            #     )
+            try:
+                tier_cost_models = pkl.load(
+                    open(self.config["lr_model"]["tier_lr_cost_model"], "rb")
+                )
+                tier_cache_models = pkl.load(
+                    open(self.config["lr_model"]["tier_lr_cache_model"], "rb")
+                )
+                (
+                    tier_best_T,
+                    tier_best_h,
+                    tier_best_ratio,
+                    tier_best_var,
+                    tier_best_cost,
+                ) = model_lr.traverse_var_optimizer_uniform(
+                    tier_cache_models,
+                    tier_cost_models,
+                    z0,
+                    z1,
+                    q,
+                    w,
+                    "tier",
+                    E,
+                    M / scaling,
+                    N / scaling,
+                )
+                print(
+                    f"tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}"
+                )
+                if tier_best_cost < best_cost:
+                    row["is_leveling_policy"] = False
+                    best_T, best_h, best_ratio, best_cost = (
+                        tier_best_T,
+                        tier_best_h,
+                        tier_best_ratio,
+                        tier_best_cost,
+                    )
+            except:
+                print("Tier model not found")
             policy = row["is_leveling_policy"]
             print(
                 f"lr_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost*Q}"
@@ -442,9 +445,6 @@ class Optimizer(object):
             level_cost_models = pkl.load(
                 open(self.config["xgb_model"]["level_xgb_cost_model"], "rb")
             )
-            tier_cost_models = pkl.load(
-                open(self.config["xgb_model"]["tier_xgb_cost_model"], "rb")
-            )
             (
                 best_T,
                 best_h,
@@ -463,37 +463,44 @@ class Optimizer(object):
                 N / scaling,
             )
             row["is_leveling_policy"] = True
-            (
-                tier_best_T,
-                tier_best_h,
-                tier_best_ratio,
-                tier_best_var,
-                tier_best_cost,
-            ) = model_xgb.traverse_var_optimizer_uniform(
-                tier_cost_models,
-                0,
-                z0,
-                z1,
-                q,
-                w,
-                E,
-                M / scaling,
-                N / scaling,
-            )
             print(
                 f"level_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, best_var: {best_var}, best_cost:{best_cost*Q}"
             )
-            print(
-                f"tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}"
-            )
-            # if tier_best_cost < best_cost:
-            #     row["is_leveling_policy"] = False
-            #     best_T, best_h, best_ratio, best_cost = (
-            #         tier_best_T,
-            #         tier_best_h,
-            #         tier_best_ratio,
-            #         tier_best_cost,
-            #     )
+            try:
+                tier_cost_models = pkl.load(
+                    open(self.config["xgb_model"]["tier_xgb_cost_model"], "rb")
+                )
+                (
+                    tier_best_T,
+                    tier_best_h,
+                    tier_best_ratio,
+                    tier_best_var,
+                    tier_best_cost,
+                ) = model_xgb.traverse_var_optimizer_uniform(
+                    tier_cost_models,
+                    0,
+                    z0,
+                    z1,
+                    q,
+                    w,
+                    E,
+                    M / scaling,
+                    N / scaling,
+                )
+
+                print(
+                    f"tier_optimizer: best_T: {tier_best_T}, best_h: {tier_best_h}, best_ratio: {tier_best_ratio}, best_var: {tier_best_var}, best_cost:{tier_best_cost*Q}"
+                )
+                if tier_best_cost < best_cost:
+                    row["is_leveling_policy"] = False
+                    best_T, best_h, best_ratio, best_cost = (
+                        tier_best_T,
+                        tier_best_h,
+                        tier_best_ratio,
+                        tier_best_cost,
+                    )
+            except:
+                print("Tier model not found")
             policy = row["is_leveling_policy"]
             print(
                 f"xgb_optimizer: best_T: {best_T}, best_h: {best_h}, best_ratio: {best_ratio}, is_leveling_policy: {policy}, best_cost:{best_cost*Q}"

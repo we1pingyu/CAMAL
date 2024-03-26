@@ -70,14 +70,14 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
         input_file_names.push_back(file.name);
         level_size += file.size;
     }
-    if (input_file_names.size() <= K)
+    if (input_file_names.size() < 4)
     {
         this->meta_data_mutex.unlock();
         return nullptr;
     }
     if (level_idx == 0)
     {
-        if (input_file_names.size() > K)
+        if (input_file_names.size() >= 4)
         {
             // pick targer output level
             int target_lvl = 1;
@@ -100,7 +100,7 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
                     min_size = lvl_size;
                     target_lvl = i;
                 }
-                if (lvl_size == 0)
+                if (lvl_size < min_size + this->rocksdb_opt.target_file_size_base)
                 {
                     empty_levels.push_back(i);
                 }
@@ -185,7 +185,7 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
                         min_size = lvl_size;
                         target_lvl = j;
                     }
-                    if (lvl_size == 0)
+                    if (lvl_size < min_size + this->rocksdb_opt.target_file_size_base)
                     {
                         empty_levels.push_back(j);
                     }
