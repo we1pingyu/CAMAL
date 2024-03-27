@@ -337,9 +337,9 @@ int main(int argc, char *argv[])
         }
         case 3:
         {
-            key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
-            // key_log->log_key(key_value.first);
-            db->Put(write_opt, key_value.first, key_value.second);
+            // key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
+            // // key_log->log_key(key_value.first);
+            // db->Put(write_opt, key_value.first, key_value.second);
             break;
         }
         default:
@@ -348,11 +348,18 @@ int main(int argc, char *argv[])
     }
     delete it;
 
+    db->Flush(rocksdb::FlushOptions());
     while (compactor->compactions_left_count > 0)
         ;
+    while (compactor->requires_compaction(db))
+    {
+        while (compactor->compactions_left_count > 0)
+            ;
+    }
 
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
+    latency += write_time * env.writes * env.steps / env.N;
     db->GetColumnFamilyMetaData(&cf_meta);
     run_per_level = "[";
     for (auto &level : cf_meta.levels)
