@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <vector>
+#include <fstream>
 
 #include "clipp.h"
 #include "spdlog/spdlog.h"
@@ -74,6 +75,8 @@ typedef struct environment
     bool tuning_T = false;
     bool tuning_h = false;
     bool rocksdb_default_config = false;
+    int w = 10000;
+    double r = 0.05;
 
 } environment;
 
@@ -99,6 +102,8 @@ environment parse_args(int argc, char *argv[])
                                           (option("--default-config").set(env.rocksdb_default_config)) % "whether use rocksdb default config"));
 
     auto run_opt = ("run options:" % ((option("-s", "--steps") & integer("num", env.steps)) % ("steps, [default: " + to_string(env.steps) + "]"),
+                                      (option("-w") & integer("num", env.w)) % ("monitor period"),
+                                      (option("-r") & number("num", env.r)) % ("threshold for reconfiguration"),
                                       (option("--dist") & value("mode", env.dist_mode)) % ("distribution mode ['uniform', 'zipf']"),
                                       (option("--skew") & number("num", env.skew)) % ("skewness for zipfian [0, 1)"),
                                       (option("--sel") & number("num", env.sel)) % ("selectivity of range query"),
@@ -178,29 +183,81 @@ void print_db_status(rocksdb::DB *db)
     }
 }
 
+void model_serving(std::vector<double> workload, double &T, double &h, double &ratio)
+{
+    ofstream fout;
+    fout.open("workloads.in", std::ios::out);
+    for (int i = 0; i < 4; ++i)
+        fout << workload[i] << " ";
+    fout.close();
+
+    int ret = -1;
+    while (ret < 3)
+    {
+        auto fparams = freopen("optimal_params.in", "r", stdin);
+        if (fparams != nullptr) {
+            ret = scanf("%lf%lf%lf", &T, &h, &ratio);
+            fclose(fparams);
+        }
+    }
+    remove("optimal_params.in");
+}
+
+void update_param(environment env, std::vector<double> workload, int cur_N,
+                  rocksdb::DB *db, tmpdb::Compactor *compactor, rocksdb::FilterPolicy *filter_policy) 
+{
+    double T, h, ratio;
+    model_serving(workload, T, h, ratio);
+
+    auto tune_time_start = std::chrono::high_resolution_clock::now();
+    if (env.tuning_T && env.T != T)
+    {
+        spdlog::info("update T: from {} to {}", env.T, T);
+        env.T = T;
+        compactor->updateT(env.T);
+    }
+
+    if (env.tuning_h && env.bits_per_element != h)
+    {
+        spdlog::info("update h: from {} to {}", env.bits_per_element, h);
+        env.bits_per_element = h;
+        filter_policy->Update_bpe(env.bits_per_element);
+
+        env.B = int(env.M - env.bits_per_element * cur_N) >> 3;
+        rocksdb::Status status = db->SetOptions({{"write_buffer_size", std::to_string(env.B)}});
+        if (!status.ok())
+        {
+            printf("Set write_buffer_size fail: code=%d\n", status.code());
+        }
+        compactor->updateM(env.B);
+    }
+
+    while (compactor->requires_compaction(db))
+    {
+        while (compactor->compactions_left_count > 0)
+            ;
+    }
+    auto tune_time_end = std::chrono::high_resolution_clock::now();
+    auto latency_t = std::chrono::duration_cast<std::chrono::milliseconds>(tune_time_end - tune_time_start).count();
+    spdlog::info("tunning time: {}", latency_t);
+}
+
 int main(int argc, char *argv[])
 {
     spdlog::set_pattern("[%T.%e]%^[%l]%$ %v");
     environment env = parse_args(argc, argv);
 
     std::vector<std::vector<double>> workloads;
-    std::vector<double> best_T;
-    std::vector<double> best_h;
-    std::vector<double> best_ratio;
 
-    auto fworkloads = freopen("optimal_params.in", "r", stdin);
+    auto fworkloads = freopen("test_workloads.in", "r", stdin);
     if (fworkloads == nullptr)
         return 0;
 
-    double z0, z1, q, w, T, h, ratio;
-    while (~scanf("%lf %lf %lf %lf %lf %lf %lf\n", &z0, &z1, &q, &w, &T, &h, &ratio))
-    {
+    double z0, z1, q, w;
+    while (~scanf("%lf %lf %lf %lf\n", &z0, &z1, &q, &w))
         workloads.push_back({z0, z1, q, w});
-        best_T.push_back(T);
-        best_h.push_back(h);
-        spdlog::info("best T: {}, best h: {}", T, h);
-        best_ratio.push_back(ratio);
-    }
+
+    fclose(fworkloads);
 
     if (env.verbose == 1)
     {
@@ -223,6 +280,7 @@ int main(int argc, char *argv[])
         rocksdb::DestroyDB(env.db_path, rocksdb::Options());
     }
 
+    double ratio;
     size_t M = env.M;
     if (env.rocksdb_default_config)
     {
@@ -231,8 +289,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        env.T = best_T[0];
-        env.bits_per_element = best_h[0];
+        model_serving(workloads[0], env.T, env.bits_per_element, ratio);
     }
     env.B = int(M - env.bits_per_element * env.N) >> 3;
     spdlog::info("env.T: {}, env.bits_per_element: {}, env.B: {}, cache_cap: {}", env.T, env.bits_per_element, env.B, env.cache_cap);
@@ -390,43 +447,12 @@ int main(int argc, char *argv[])
     std::vector<int64_t> latency;
     bool tuning = (env.tuning_T || env.tuning_h);
 
+    auto cur_workload = workloads[0];
+    std::vector<int> freq = {0, 0, 0, 0};
+    int num_ops = 0;
+
     for (size_t k = 0; k < num_workloads - 1; ++k)
     {
-        if (tuning)
-        {
-            auto time_start = std::chrono::high_resolution_clock::now();
-            if (env.tuning_T && env.T != best_T[k + 1])
-            {
-                spdlog::info("update T: from {} to {}", env.T, best_T[k + 1]);
-                env.T = best_T[k + 1];
-                compactor->updateT(env.T);
-            }
-
-            if (env.tuning_h && env.bits_per_element != best_h[k + 1])
-            {
-                spdlog::info("update h: from {} to {}", env.bits_per_element, best_h[k + 1]);
-                env.bits_per_element = best_h[k + 1];
-                filter_policy->Update_bpe(env.bits_per_element);
-
-                env.B = int(env.M - env.bits_per_element * cur_N) >> 3;
-                rocksdb::Status status = db->SetOptions({{"write_buffer_size", std::to_string(env.B)}});
-                if (!status.ok())
-                {
-                    printf("Set write_buffer_size fail: code=%d\n", status.code());
-                }
-                compactor->updateM(env.B);
-            }
-
-            while (compactor->requires_compaction(db))
-            {
-                while (compactor->compactions_left_count > 0)
-                    ;
-            }
-            auto time_end = std::chrono::high_resolution_clock::now();
-            auto latency_t = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
-            spdlog::info("tunning time: {}", latency_t);
-        }
-
         auto time_start = std::chrono::high_resolution_clock::now();
         auto workload = workloads[k];
         std::vector<double> stride;
@@ -450,6 +476,32 @@ int main(int argc, char *argv[])
             }
             for (int j = 0; j < 4; ++j)
                 workload[j] += stride[j];
+            
+            if (tuning) 
+            {
+                freq[outcome] += 1;
+                num_ops += 1;
+                if (num_ops == env.w) {
+                    double delta = 0, ratio;
+                    for (int j = 0; j < 4; ++j) 
+                    {
+                        ratio = 1.0 * freq[j] / env.w;
+                        if (ratio > cur_workload[j])
+                            delta += ratio - cur_workload[j];
+                    }
+                    if (delta > env.r)
+                    {
+                        for (int j = 0; j < 4; ++j)
+                            cur_workload[j] = 1.0 * freq[j] / env.w;
+
+                        update_param(env, cur_workload, cur_N, db, compactor, filter_policy);
+                    }
+
+                    num_ops = 0;
+                    for (int j = 0; j < 4; ++j)
+                        freq[j] = 0;
+                }
+            }
 
             switch (outcome)
             {

@@ -6,9 +6,8 @@ import logging
 import os
 import re
 import yaml
-import copy
-import random
 import pickle as pkl
+from multiprocessing import Process
 
 sys.path.append("./lrkv")
 from runner import Runner
@@ -60,33 +59,60 @@ workloads = [
     (0.75, 0.05, 0.05, 0.15),
 ]
 
-optimal_params_filename = "optimal_params.in"
-if os.path.exists(optimal_params_filename):
-    os.remove(optimal_params_filename)
+test_workloads_filename = "test_workloads.in"
+if os.path.exists(test_workloads_filename):
+    os.remove(test_workloads_filename)
 
 dists = ["uniform"]
 
+def model_server(model="xgb"):
+    if model == "xgb":
+        level_cost_models = pkl.load(
+            open(config["xgb_model"]["level_xgb_cost_model"], "rb")
+        )
+        while True:
+            if not os.path.exists('workloads.in'):
+                continue
 
-class Optimizer(object):
-    def __init__(self, config):
-        self.db_id = 0
-        self.config = config
-        self.logger = logging.getLogger("rlt_logger")
-        self.latency_per_workload_prog = re.compile(
-            r"\[[0-9:.]+\]\[info\] latency_per_workload : " r"(\[[0-9,\s]+\])"
+            f_in = open('workloads.in', "r")
+            workload = f_in.readline().strip().split(' ')
+            z0, z1, q, w = [float(x) for x in workload]
+            (
+                best_T,
+                best_h,
+                best_ratio,
+                best_var,
+                best_cost,
+            ) = model_xgb.traverse_var_optimizer_uniform(
+                level_cost_models,
+                1,
+                z0,
+                z1,
+                q,
+                w,
+                E,
+                M / scaling,
+                N / scaling,
+            )
+            optimal_params_file = open("optimal_params.in", "w")
+            optimal_params_file.write(f"{best_T} {best_h} {best_ratio}\n")
+            optimal_params_file.close()
+            os.remove('workloads.in')
+    else:        
+        level_cost_models = pkl.load(
+            open(config["lr_model"]["level_lr_cost_model"], "rb")
+        )
+        level_cache_models = pkl.load(
+            open(config["lr_model"]["level_lr_cache_model"], "rb")
         )
 
-    def get_optimal_param(self, workload, model="lr"):
-        optimal_params_file = open(optimal_params_filename, "a")
-        z0, z1, q, w = workload
-        if model == "lr":
-            level_cost_models = pkl.load(
-                open(self.config["lr_model"]["level_lr_cost_model"], "rb")
-            )
-            level_cache_models = pkl.load(
-                open(self.config["lr_model"]["level_lr_cache_model"], "rb")
-            )
+        while True:
+            if not os.path.exists('workloads.in'):
+                continue
 
+            f_in = open('workloads.in', "r")
+            workload = f_in.readline().strip().split(' ')
+            z0, z1, q, w = [float(x) for x in workload]
             (
                 best_T,
                 best_h,
@@ -105,36 +131,32 @@ class Optimizer(object):
                 M / scaling,
                 N / scaling,
             )
-            optimal_params_file.write(
-                f"{z0} {z1} {q} {w} {best_T} {best_h} {best_ratio}\n"
-            )
-            return [z0, z1, q, w, best_T, best_h, best_ratio]
-        else:
-            level_cost_models = pkl.load(
-                open(self.config["xgb_model"]["level_xgb_cost_model"], "rb")
-            )
-            (
-                best_T,
-                best_h,
-                best_ratio,
-                best_var,
-                best_cost,
-            ) = model_xgb.traverse_var_optimizer_uniform(
-                level_cost_models,
-                1,
-                z0,
-                z1,
-                q,
-                w,
-                E,
-                M / scaling,
-                N / scaling,
-            )
+            optimal_params_file = open("optimal_params.in", "w")
+            optimal_params_file.write(f"{best_T} {best_h} {best_ratio}\n")
+            optimal_params_file.close()
+            os.remove('workloads.in')
 
-        optimal_params_file.write(f"{z0} {z1} {q} {w} {best_T} {best_h} {best_ratio}\n")
-        return [z0, z1, q, w, best_T, best_h, best_ratio]
 
-    def start_db_runner(self, tuning_T, tuning_h, default_config):
+class Optimizer(object):
+    def __init__(self, config):
+        self.db_id = 0
+        self.config = config
+        self.logger = logging.getLogger("rlt_logger")
+        self.latency_per_workload_prog = re.compile(
+            r"\[[0-9:.]+\]\[info\] latency_per_workload : " r"(\[[0-9,\s]+\])"
+        )
+
+    def generate_workloads(self, workload):
+        test_workloads_file = open(test_workloads_filename, "a")
+        z0, z1, q, w = workload
+        test_workloads_file.write(f"{z0} {z1} {q} {w}\n")
+        return [z0, z1, q, w]
+
+
+    def start_db_runner(self, tuning_T, tuning_h, default_config, w=10000, r=0.05):
+        server = Process(target=model_server, args=("xgb",))
+        server.start()
+
         cmd = [
             "build/db_runner_dynamic",
             f"/tmp/level_test_{self.db_id}",
@@ -142,6 +164,8 @@ class Optimizer(object):
             f"-M {M}",
             f"-E 1000",
             f"-s {Q}",
+            f"-w {w}",
+            f"-r {r}",
             f"--sel {sel}",
             f"--scaling {scaling}",
             f"--parallelism 1",
@@ -175,7 +199,6 @@ class Optimizer(object):
         except subprocess.TimeoutExpired:
             self.logger.warn("Timeout limit reached. Aborting")
             proc.kill()
-            return results
         try:
             latency_per_workload = self.latency_per_workload_prog.findall(proc_results)[
                 0
@@ -183,23 +206,26 @@ class Optimizer(object):
             latency_per_workload = latency_per_workload.strip()
             results = latency_per_workload.strip("][").split(", ")
             results = [int(r) for r in results]
-            return results
         except:
             self.logger.warn("Log errors")
             proc.kill()
-            return results
+
+        server.terminate()
+        return results
 
     def run(self):
         cases = []
         for workload in workloads:
-            case = self.get_optimal_param(workload, "xgb")
+            case = self.generate_workloads(workload)
             cases.append(case)
 
         latency_ht = self.start_db_runner(
-            tuning_T=True, tuning_h=True, default_config=False
+            tuning_T=True, tuning_h=True, default_config=False, 
+            w=10000, r=0.05
         )
         latency_t = self.start_db_runner(
-            tuning_T=True, tuning_h=False, default_config=False
+            tuning_T=True, tuning_h=False, default_config=False,
+            w=10000, r=0.05
         )
         # latency_h = self.start_db_runner(
         #     tuning_T=False, tuning_h=True, default_config=False
@@ -221,17 +247,17 @@ class Optimizer(object):
                 row["source_z1"],
                 row["source_q"],
                 row["source_w"],
-            ) = cases[i][:4]
+            ) = cases[i]
             (
                 row["target_z0"],
                 row["target_z1"],
                 row["target_q"],
                 row["target_w"],
-            ) = cases[i + 1][:4]
+            ) = cases[i + 1]
             row["N"] = N
             row["M"] = M
             row["s"] = Q
-            row["T"], row["h"], row["ratio"] = cases[i + 1][4:]
+            # row["T"], row["h"], row["ratio"] = cases[i + 1][4:]
             row["latency_tuning_ht"] = latency_ht[i]
             # row["latency_tuning_T"] = latency_t[i]
             # row["latency_tuning_h"] = latency_h[i]
