@@ -19,15 +19,15 @@ lsm_tree_config:
     s: 0      # Average range query selectivity
     E: 8192    # Size of data entries in bits (leave space in a block for meta)
 
-lsm_tree_config: 
-    samples: 4
-    scaling: 1 # 1 for training, 10 for testing
-    M: 64000000 # 16MB*5/10
-    N: 5000000
-    Q:   250000
-    phi: 1 # endure parameter
-    s: 0       # Average range query selectivity
-    E: 8192    # Size of data entries in bits (leave space in a block for meta)
+# lsm_tree_config: 
+#     samples: 4
+#     scaling: 1 # 1 for training, 10 for testing
+#     M: 64000000 # 16MB*5/10
+#     N: 5000000
+#     Q:   250000
+#     phi: 1 # endure parameter
+#     s: 0       # Average range query selectivity
+#     E: 8192    # Size of data entries in bits (leave space in a block for meta)
 
 jobs:
     job_list:
