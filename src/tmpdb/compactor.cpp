@@ -105,11 +105,11 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
                     empty_levels.push_back(i);
                 }
             }
-            // if (!empty_levels.empty())
-            // {
-            //     size_t random_index = std::rand() % empty_levels.size();
-            //     target_lvl = empty_levels[random_index];
-            // }
+            if (!empty_levels.empty())
+            {
+                size_t random_index = std::rand() % empty_levels.size();
+                target_lvl = empty_levels[random_index];
+            }
             // pick input file
             std::vector<std::string> compact_files;
             for (auto &file : cf_meta.levels[0].files)
@@ -196,22 +196,22 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
                     target_lvl = empty_levels[random_index];
                 }
                 // pick overlap input files
-                for (auto &input_file : compact_files_meta)
-                {
-                    for (size_t j = i * K + 1; j < (i + 1) * K ; j++)
-                    {
-                        for (auto &file : cf_meta.levels[j].files)
-                        {
-                            if (file.being_compacted || input_file.name == file.name)
-                            {
-                                continue;
-                            }
-                            if ((input_file.smallestkey >= file.smallestkey && input_file.smallestkey <= file.largestkey) ||
-                                (input_file.largestkey >= file.smallestkey && input_file.largestkey <= file.largestkey))
-                                compact_files.push_back(file.name);
-                        }
-                    }
-                }
+                // for (auto &input_file : compact_files_meta)
+                // {
+                //     for (size_t j = i * K + 1; j < (i + 1) * K ; j++)
+                //     {
+                //         for (auto &file : cf_meta.levels[j].files)
+                //         {
+                //             if (file.being_compacted || input_file.name == file.name)
+                //             {
+                //                 continue;
+                //             }
+                //             if ((input_file.smallestkey >= file.smallestkey && input_file.smallestkey <= file.largestkey) ||
+                //                 (input_file.largestkey >= file.smallestkey && input_file.largestkey <= file.largestkey))
+                //                 compact_files.push_back(file.name);
+                //         }
+                //     }
+                // }
                 this->meta_data_mutex.unlock();
                 if (compact_files.empty())
                     return nullptr;

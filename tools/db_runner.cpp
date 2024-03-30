@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
     rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
-    rocksdb_opt.target_file_size_base = env.scaling * env.file_size;
+    rocksdb_opt.target_file_size_base = 2 * env.file_size;
     rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
     rocksdb_opt.disable_auto_compactions = true;
     // rocksdb_opt.max_background_jobs = 1;
@@ -259,8 +259,8 @@ int main(int argc, char *argv[])
         key_value = data_gen->gen_kv_pair(env.E);
         db->Put(write_opt, key_value.first, key_value.second);
     }
-    while (compactor->compactions_left_count > 0)
-        ;
+    // while (compactor->compactions_left_count > 0)
+    //     ;
 
     auto write_time_end = std::chrono::high_resolution_clock::now();
     auto write_time = std::chrono::duration_cast<std::chrono::milliseconds>(write_time_end - write_time_start).count();
@@ -348,8 +348,8 @@ int main(int argc, char *argv[])
     }
     delete it;
 
-    while (compactor->compactions_left_count > 0)
-        ;
+    // while (compactor->compactions_left_count > 0)
+    //     ;
 
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
