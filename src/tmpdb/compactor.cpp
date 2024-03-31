@@ -70,14 +70,14 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
         input_file_names.push_back(file.name);
         level_size += file.size;
     }
-    if (input_file_names.size() < 1)
+    if (input_file_names.size() < 4)
     {
         this->meta_data_mutex.unlock();
         return nullptr;
     }
     if (level_idx == 0)
     {
-        if (input_file_names.size() >= 1)
+        if (input_file_names.size() >= 4)
         {
             // pick targer output level
             int target_lvl = 1;
