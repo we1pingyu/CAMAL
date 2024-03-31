@@ -100,7 +100,7 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
                     min_size = lvl_size;
                     target_lvl = i;
                 }
-                if (lvl_size < min_size + this->rocksdb_opt.target_file_size_base || min_size != 0)
+                if (lvl_size < min_size + this->rocksdb_opt.target_file_size_base && min_size != 0)
                 {
                     empty_levels.push_back(i);
                 }
@@ -185,7 +185,7 @@ CompactionTask *Compactor::PickCompaction(rocksdb::DB *db,
                         min_size = lvl_size;
                         target_lvl = j;
                     }
-                    if (lvl_size < min_size + this->rocksdb_opt.target_file_size_base || min_size != 0)
+                    if (lvl_size < min_size + this->rocksdb_opt.target_file_size_base && min_size != 0)
                     {
                         empty_levels.push_back(j);
                     }

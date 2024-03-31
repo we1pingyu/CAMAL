@@ -364,7 +364,6 @@ int main(int argc, char *argv[])
 
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
-    latency += write_time * env.writes * env.steps / env.N;
     db->GetColumnFamilyMetaData(&cf_meta);
     run_per_level = "[";
     for (auto &level : cf_meta.levels)

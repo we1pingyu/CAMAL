@@ -27,7 +27,7 @@ lsm_tree_config:
 #     Q:   250000
 #     phi: 1 # endure parameter
 #     s: 0       # Average range query selectivity
-#     E: 8192    # Size of data entries in bits (leave space in a block for meta)
+#     E: 8000    # Size of data entries in bits (leave space in a block for meta)
 
 jobs:
     job_list:
