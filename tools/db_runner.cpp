@@ -28,6 +28,7 @@ typedef struct environment
     double empty_reads = 0.25;
     double range_reads = 0.25;
     double writes = 0.25;
+    double dels = 0.0;
     size_t prime_reads = 0;
 
     size_t steps = 10;
@@ -92,6 +93,7 @@ environment parse_args(int argc, char *argv[])
                                       (option("-r", "--non_empty_reads") & number("num", env.non_empty_reads)) % ("non-empty queries, [default: " + to_string(env.non_empty_reads) + "]"),
                                       (option("-q", "--range_reads") & number("num", env.range_reads)) % ("range reads, [default: " + to_string(env.range_reads) + "]"),
                                       (option("-w", "--writes") & number("num", env.writes)) % ("writes, [default: " + to_string(env.writes) + "]"),
+                                      (option("--dels") & number("num", env.writes)) % ("deletes, [default: " + to_string(env.dels) + "]"),
                                       (option("-s", "--steps") & integer("num", env.steps)) % ("steps, [default: " + to_string(env.steps) + "]"),
                                       (option("--dist") & value("mode", env.dist_mode)) % ("distribution mode ['uniform', 'zipf']"),
                                       (option("--skew") & number("num", env.skew)) % ("skewness for zipfian [0, 1)"),
@@ -194,10 +196,10 @@ int main(int argc, char *argv[])
     rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
-    rocksdb_opt.target_file_size_base = 2 * env.file_size;
+    rocksdb_opt.target_file_size_base = env.scaling * env.file_size;
     rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
     rocksdb_opt.disable_auto_compactions = true;
-    // rocksdb_opt.max_background_jobs = 1;
+    rocksdb_opt.max_background_jobs = 1;
     rocksdb_opt.write_buffer_size = env.B / 2;
 
     tmpdb::Compactor *compactor = nullptr;
@@ -337,9 +339,18 @@ int main(int argc, char *argv[])
         }
         case 3:
         {
-            key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
-            // key_log->log_key(key_value.first);
-            db->Put(write_opt, key_value.first, key_value.second);
+            if (static_cast<double>(rand()) / RAND_MAX > env.dels)
+            {
+                key_value = data_gen->gen_new_kv_pair(compactor_opt.entry_size);
+                // key_log->log_key(key_value.first);
+                db->Put(write_opt, key_value.first, key_value.second);
+            }
+            else
+            {
+                key = data_gen->gen_existing_key();
+                // key_log->log_key(key);
+                db->Delete(write_opt, key);
+            }
             break;
         }
         default:
@@ -348,8 +359,8 @@ int main(int argc, char *argv[])
     }
     delete it;
 
-    // while (compactor->compactions_left_count > 0)
-    //     ;
+    while (compactor->compactions_left_count > 0)
+        ;
 
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
