@@ -281,7 +281,7 @@ class Optimizer(object):
             row["T"] = 10
             row["h"] = 10
             best_h = 10
-            row["cache_cap"] = 0.33 * (M - best_h * N) / 8
+            row["cache_cap"] = 0.2 * (M - best_h * N) / 8
             row["M"] = M - row["cache_cap"] * 8
             self.logger.info(f"Building DB at size : {N}")
             db = RocksDB(self.config)

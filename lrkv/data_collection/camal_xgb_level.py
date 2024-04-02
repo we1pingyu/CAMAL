@@ -197,12 +197,12 @@ class LevelCost(object):
                     min_err = err
                     temp = T
             if df == []:
-                T_list = self.sample_around_x0(temp, self.samples + 1, 2, 200)
+                T_list = self.sample_around_x0(temp, self.samples, 2, 200)
             else:
                 regr = iter_model(df, "level", E, M, N)
                 t = traverse_for_T([regr], z0, z1, q, w, E, M, N, h0=5, n=-1)
                 T_list = [temp]
-                T_list = weight_sampling(t, 0, self.samples + 1, T_list)
+                T_list = weight_sampling(t, 0, self.samples, T_list)
             print(T_list)
             z0, z1, q, w = workload
             ratio = 1.0
@@ -250,7 +250,7 @@ class LevelCost(object):
                 regr = iter_model(df, "level", E, M, N)
                 h = traverse_for_h([regr], z0, z1, q, w, E, M, N, T0=T0, n=-1)
                 h_list = [temp]
-                h_list = weight_sampling(h, 1, self.samples - 1, h_list)
+                h_list = weight_sampling(h, 1, self.samples, h_list)
             print(h_list)
             for h in h_list:
                 buffer = ratio * (M - h * N)

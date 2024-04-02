@@ -5,12 +5,12 @@ app:
     ROOT_DIR: "lrkv"
     DATA_DIR: "data"
 
-    EXECUTION_PATH: "build/db_runner"
+    EXECUTION_PATH: "sudo cgexec -g blkio:mygroup build/db_runner"
     DATABASE_PATH: "/tmp"
     KEY_FILE_PATH: "data/keys.data"
 
 lsm_tree_config: 
-    samples: 4
+    samples: 3
     scaling: 1 # 1 for training, 10 for testing
     M: 12800000  # 16MB/10
     N: 1000000
