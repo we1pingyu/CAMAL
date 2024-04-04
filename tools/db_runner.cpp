@@ -194,13 +194,13 @@ int main(int argc, char *argv[])
     rocksdb_opt.bottommost_compression = kNoCompression;
     rocksdb_opt.use_direct_reads = true;
     rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
-    rocksdb_opt.max_open_files = 512;
+    rocksdb_opt.max_open_files = -1;
     rocksdb_opt.avoid_unnecessary_blocking_io = true;
-    rocksdb_opt.target_file_size_base = env.scaling * env.file_size;
+    rocksdb_opt.target_file_size_base = env.scaling * 1048576;
     rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
     rocksdb_opt.disable_auto_compactions = true;
     // rocksdb_opt.max_background_jobs = 1;
-    rocksdb_opt.write_buffer_size = env.B / 2;
+    rocksdb_opt.write_buffer_size = env.B;
 
     tmpdb::Compactor *compactor = nullptr;
     tmpdb::CompactorOptions compactor_opt;
@@ -359,8 +359,10 @@ int main(int argc, char *argv[])
     }
     delete it;
 
-    // while (compactor->compactions_left_count > 0)
-    //     ;
+    db->Flush(rocksdb::FlushOptions());
+
+    while (compactor->compactions_left_count > 0)
+        ;   
 
     auto time_end = std::chrono::high_resolution_clock::now();
     auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
