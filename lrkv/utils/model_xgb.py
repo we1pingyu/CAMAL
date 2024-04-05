@@ -153,7 +153,7 @@ def traverse_var_optimizer_uniform(cost_models, policy, z0, z1, q, w, E, M, N):
     settings = []
     for T in range(2, 100):
         for h in range(2, 11):
-            for ratio in [0.9, 1.0]:
+            for ratio in [0.6, 0.8, 1.0]:
                 x = get_cost_uniform(T, h, ratio, z0, z1, q, w, E, M, N)
                 settings.append((T, h, ratio, None))
                 xs.append(x)
