@@ -12,7 +12,7 @@ app:
 lsm_tree_config: 
     samples: 4
     scaling: 1 # 1 for training, 10 for testing
-    M: 25600000  # 16MB/10
+    M: 12800000  # 16MB/10
     N: 1000000
     Q:   50000
     phi: 1 # endure parameter

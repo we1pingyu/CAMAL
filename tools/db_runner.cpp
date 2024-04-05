@@ -39,9 +39,9 @@ typedef struct environment
     double T = 10;
     double K = 0;
 
-    size_t B = 1 << 18;         //> 1 KB
-    size_t E = 1 << 7;          //> 128 B
-    size_t file_size = 6710886; //> 4 MB;
+    size_t B = 1 << 18;          //> 1 KB
+    size_t E = 1 << 7;           //> 128 B
+    size_t file_size = 16777216; //> 4 MB;
     double bits_per_element = 5.0;
     size_t N = 1e6;
     size_t L = 0;
@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
     rocksdb_opt.compaction_style = rocksdb::kCompactionStyleNone;
     rocksdb_opt.disable_auto_compactions = true;
     // rocksdb_opt.max_background_jobs = 1;
-    rocksdb_opt.write_buffer_size = env.B / 2;
+    rocksdb_opt.write_buffer_size = env.B;
 
     tmpdb::Compactor *compactor = nullptr;
     tmpdb::CompactorOptions compactor_opt;
@@ -293,7 +293,9 @@ int main(int argc, char *argv[])
     double cumprob[] = {p[0], p[0] + p[1], p[0] + p[1] + p[2], 1.0};
     std::string value, key, limit;
     data_gen = new YCSBGenerator(env.N, env.dist_mode, env.skew);
-    rocksdb::Iterator *it = db->NewIterator(rocksdb::ReadOptions());
+    ReadOptions read_options;
+    read_options.total_order_seek = true;
+    rocksdb::Iterator *it = db->NewIterator(read_options);
     auto time_start = std::chrono::high_resolution_clock::now();
     env.sel = 4096 * env.sel / env.E;
     for (size_t i = 0; i < env.steps; i++)
@@ -314,14 +316,14 @@ int main(int argc, char *argv[])
         {
             key = data_gen->gen_new_dup_key();
             // key_log->log_key(key);
-            status = db->Get(rocksdb::ReadOptions(), key, &value);
+            status = db->Get(read_options, key, &value);
             break;
         }
         case 1:
         {
             key = data_gen->gen_existing_key();
             // key_log->log_key(key);
-            status = db->Get(rocksdb::ReadOptions(), key, &value);
+            status = db->Get(read_options, key, &value);
             break;
         }
         case 2:
