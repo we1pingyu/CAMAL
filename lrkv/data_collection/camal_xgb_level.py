@@ -279,7 +279,7 @@ class LevelCost(object):
             h0 = candidates[0][1]
 
             min_err = 1e9
-            for ratio in [0.9]:
+            for ratio in [0.6, 0.8]:
                 buffer = ratio * (M - h0 * N)
                 cache_cap = (1 - ratio) * M / 8
                 size_ratio = T0
