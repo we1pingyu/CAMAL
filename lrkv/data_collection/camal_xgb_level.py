@@ -230,6 +230,7 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_level_ckpt"])
                 step += 1
+                self.logger.info(f"Used {time.time()-start_time}s\n")
 
             # iter model
             regr = iter_model(df, "level", E, M, N)
@@ -272,6 +273,8 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_level_ckpt"])
                 step += 1
+                self.logger.info(f"Used {time.time()-start_time}s\n")
+                
             # iter model
             regr = iter_model(df, "level", E, M, N)
             candidates = traverse_for_h([regr], z0, z1, q, w, E, M, N, T0=T0, n=1)
@@ -300,6 +303,7 @@ class LevelCost(object):
                 df.append(row)
                 pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_level_ckpt"])
                 step += 1
+                self.logger.info(f"Used {time.time()-start_time}s\n")
 
         self.logger.info("Exporting data from xgb level")
         pd.DataFrame(df).to_csv(self.config["samples_path"]["xgb_level_final"])

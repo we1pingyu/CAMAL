@@ -39,9 +39,9 @@ typedef struct environment
     double T = 10;
     double K = 0;
 
-    size_t B = 1 << 18;          //> 1 KB
-    size_t E = 1 << 7;           //> 128 B
-    size_t file_size = 16777216; //> 4 MB;
+    size_t B = 1 << 18;         //> 1 KB
+    size_t E = 1 << 7;          //> 128 B
+    size_t file_size = 1048576; //> 4 MB;
     double bits_per_element = 5.0;
     size_t N = 1e6;
     size_t L = 0;
@@ -259,8 +259,8 @@ int main(int argc, char *argv[])
         key_value = data_gen->gen_kv_pair(env.E);
         db->Put(write_opt, key_value.first, key_value.second);
     }
-    // while (compactor->compactions_left_count > 0)
-    //     ;
+    while (compactor->compactions_left_count > 0)
+        ;
 
     auto write_time_end = std::chrono::high_resolution_clock::now();
     auto write_time = std::chrono::duration_cast<std::chrono::milliseconds>(write_time_end - write_time_start).count();
@@ -359,7 +359,7 @@ int main(int argc, char *argv[])
     }
     delete it;
 
-    db->Flush(rocksdb::FlushOptions());
+    // db->Flush(rocksdb::FlushOptions());
 
     while (compactor->compactions_left_count > 0)
         ;

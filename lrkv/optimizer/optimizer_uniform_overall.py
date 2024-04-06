@@ -553,13 +553,6 @@ class Optimizer(object):
             print("rocksdb_t: ", np.mean(rocksdb_t))
             print("lr_t: ", np.mean(lr_t))
             print("xgb_t: ", np.mean(xgb_t))
-            _a = []
-            _b = []
-            for a, b, c, d, e in zip(non_t, non_cache_t, rocksdb_t, lr_t, xgb_t):
-                _a.append(e / a)
-                _b.append(e / b)
-            print("xgb/non: ", np.mean(_a))
-            print("xgb/rocksdb: ", np.mean(_b))
         self.logger.info("Exporting data from lr optimizer")
         pd.DataFrame(df).to_csv(self.config["optimizer_path"]["final"])
         self.logger.info("Finished optimizer\n")

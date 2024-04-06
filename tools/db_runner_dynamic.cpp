@@ -195,7 +195,8 @@ void model_serving(std::vector<double> workload, double &T, double &h, double &r
     while (ret < 3)
     {
         auto fparams = freopen("optimal_params.in", "r", stdin);
-        if (fparams != nullptr) {
+        if (fparams != nullptr)
+        {
             ret = scanf("%lf%lf%lf", &T, &h, &ratio);
             fclose(fparams);
         }
@@ -204,7 +205,7 @@ void model_serving(std::vector<double> workload, double &T, double &h, double &r
 }
 
 void update_param(environment env, std::vector<double> workload, int cur_N,
-                  rocksdb::DB *db, tmpdb::Compactor *compactor, rocksdb::FilterPolicy *filter_policy) 
+                  rocksdb::DB *db, tmpdb::Compactor *compactor, rocksdb::FilterPolicy *filter_policy)
 {
     double T, h, ratio;
     model_serving(workload, T, h, ratio);
@@ -304,8 +305,8 @@ int main(int argc, char *argv[])
     // rocksdb_opt.IncreaseParallelism(env.parallelism);
     rocksdb_opt.compression = rocksdb::kNoCompression;
     rocksdb_opt.bottommost_compression = kNoCompression;
-    // rocksdb_opt.use_direct_reads = true;
-    // rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
+    rocksdb_opt.use_direct_reads = true;
+    rocksdb_opt.use_direct_io_for_flush_and_compaction = true;
     rocksdb_opt.max_open_files = 512;
     rocksdb_opt.advise_random_on_open = false;
     rocksdb_opt.random_access_max_buffer_size = 0;
@@ -476,14 +477,15 @@ int main(int argc, char *argv[])
             }
             for (int j = 0; j < 4; ++j)
                 workload[j] += stride[j];
-            
-            if (tuning) 
+
+            if (tuning)
             {
                 freq[outcome] += 1;
                 num_ops += 1;
-                if (num_ops == env.w) {
+                if (num_ops == env.w)
+                {
                     double delta = 0, ratio;
-                    for (int j = 0; j < 4; ++j) 
+                    for (int j = 0; j < 4; ++j)
                     {
                         ratio = 1.0 * freq[j] / env.w;
                         if (ratio > cur_workload[j])
