@@ -193,7 +193,7 @@ class Optimizer(object):
             row["db_name"] = "level_optimizer"
             row["path_db"] = self.config["app"]["DATABASE_PATH"]
             z0, z1, q, w = workload
-            row["cache_cap"] = 0.125 * M / 8
+            row["cache_cap"] = 0.1 * M / 8
             row["M"] = M - row["cache_cap"] * 8
             cf = CostFunction(
                 N,
@@ -281,7 +281,7 @@ class Optimizer(object):
             row["T"] = 10
             row["h"] = 10
             best_h = 10
-            row["cache_cap"] = 0.2 * (M - best_h * N) / 8
+            row["cache_cap"] = 0.0 * (M - best_h * N) / 8
             row["M"] = M - row["cache_cap"] * 8
             self.logger.info(f"Building DB at size : {N}")
             db = RocksDB(self.config)
